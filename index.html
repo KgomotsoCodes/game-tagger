@@ -1,0 +1,2875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lichess Tagged Games</title>
+<style>
+  :root {
+    --bg: #161512;
+    --bg2: #262421;
+    --bg3: #302e2b;
+    --border: #3d3a35;
+    --text: #bababa;
+    --text-bright: #dededd;
+    --accent: #d18f00;
+    --win: #629924;
+    --loss: #b03030;
+    --draw: #888;
+    --sq-light: #f0d9b5;
+    --sq-dark: #b58863;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Noto Sans", "Segoe UI", system-ui, sans-serif;
+    font-size: 15px;
+  }
+  header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .header-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  h1 {
+    margin: 0 16px 0 0;
+    font-size: 20px;
+    color: var(--text-bright);
+    white-space: nowrap;
+  }
+  h1 span { color: var(--accent); }
+  #fetchForm { display: flex; flex-wrap: wrap; gap: 8px; flex: 1; min-width: 260px; }
+  input[type="text"], input[type="date"], input[type="number"], input[type="password"], select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-bright);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 14px;
+    outline: none;
+  }
+  input[type="date"] { color-scheme: dark; padding: 6px 8px; font-size: 13px; }
+  input[type="text"]:focus, input[type="date"]:focus, input[type="number"]:focus, input[type="password"]:focus, select:focus { border-color: var(--accent); }
+  #username { flex: 1; min-width: 120px; }
+  #loadMinRating { width: 132px; }
+  button {
+    background: var(--accent);
+    color: #161512;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  button:hover { filter: brightness(1.1); }
+  button:disabled { opacity: .5; cursor: default; }
+  .toolbar {
+    max-width: 1100px;
+    margin: 14px auto 0;
+    padding: 0 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  #search {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    color: var(--text-bright);
+    border-radius: 16px;
+    padding: 6px 14px;
+    font-size: 13px;
+    width: 200px;
+    outline: none;
+  }
+  #search:focus { border-color: var(--accent); }
+  .toolbar .toggle-on { background: var(--accent); color: #161512; font-weight: bold; }
+  .card-note {
+    margin: 8px 0 0;
+    font-size: 12.5px;
+    color: var(--text-bright);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 9px;
+    cursor: pointer;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .card-note.empty { color: #666; font-style: italic; }
+  .card-note textarea {
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    background: var(--bg);
+    border: none;
+    outline: none;
+    color: var(--text-bright);
+    font: inherit;
+    line-height: 1.4;
+    resize: vertical;
+  }
+  .note-flag, .tag-flag {
+    color: #8b8680;
+    font-size: 13px;
+    line-height: 1;
+  }
+  .tag-flag {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: inline-block;
+  }
+  .view-toggle { margin-left: auto; display: flex; }
+  #filterInfo { font-size: 12.5px; color: #8b8680; margin-right: 4px; white-space: nowrap; }
+  .btn-ghost {
+    background: var(--bg3);
+    color: var(--text);
+    font-weight: normal;
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+
+  /* sidepanel + tag tree */
+  .app { display: flex; min-height: 100vh; }
+  #sidepanel {
+    flex: 0 0 250px;
+    width: 250px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    padding: 14px 10px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  #content { flex: 1; min-width: 0; }
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--text-bright);
+    font-weight: bold;
+    font-size: 14px;
+    margin: 0 6px 10px;
+  }
+  .panel-head.second { margin-top: 18px; }
+  .head-btn {
+    background: var(--bg3);
+    color: var(--text-bright);
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: normal;
+    line-height: 1;
+    padding: 3px 9px;
+    cursor: pointer;
+  }
+  .head-btn:hover { color: var(--accent); }
+  .player-empty { color: #666; font-size: 12.5px; padding: 4px 8px; }
+  .panel-actions { display: flex; gap: 6px; margin-bottom: 10px; }
+  .panel-actions button {
+    flex: 1;
+    background: var(--bg3);
+    color: var(--text-bright);
+    font-size: 12.5px;
+    font-weight: normal;
+    padding: 6px 4px;
+  }
+  .tree ul { list-style: none; margin: 0; padding-left: 14px; }
+  .tree > ul { padding-left: 2px; }
+  .tree-empty { color: #666; font-size: 12.5px; padding: 8px 6px; }
+  .node-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13.5px;
+    color: var(--text);
+    user-select: none;
+  }
+  .node-row:hover { background: var(--bg3); }
+  .node-row.active {
+    background: rgba(209, 143, 0, .16);
+    box-shadow: inset 2px 0 0 var(--accent);
+    color: var(--text-bright);
+  }
+  .node-row.drag-over { outline: 1px dashed var(--accent); }
+  .node-row .caret { width: 12px; text-align: center; color: #8b8680; font-size: 11px; flex: 0 0 12px; }
+  .node-row .dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 9px; }
+  .node-row .nm {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .node-row .cnt { color: #8b8680; font-size: 11.5px; }
+  .node-row .row-actions { display: none; gap: 2px; }
+  .node-row:hover .row-actions { display: inline-flex; }
+  .node-row:hover .cnt { display: none; }
+  .row-actions button {
+    background: none;
+    color: #8b8680;
+    font-size: 13px;
+    padding: 0 3px;
+    line-height: 1;
+  }
+  .row-actions button:hover { color: var(--accent); }
+
+  /* profile modal */
+  .p-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-bright);
+    user-select: none;
+  }
+  .p-row:hover { background: var(--bg3); }
+  .p-row.current { background: rgba(209, 143, 0, .16); box-shadow: inset 2px 0 0 var(--accent); }
+  .p-row .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .p-row:hover .row-actions { display: inline-flex; }
+  .p-role {
+    font-size: 11px;
+    color: #8b8680;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1px 7px;
+    text-transform: capitalize;
+  }
+  .pin-row { display: flex; gap: 8px; margin-top: 10px; }
+  .pin-row input { flex: 1; }
+  .modal-error { color: var(--loss); font-size: 12.5px; margin-top: 8px; min-height: 16px; }
+  .coach-form {
+    margin-top: 10px;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .coach-form input { flex: 1; min-width: 100px; }
+  .coach-form.hidden { display: none; }
+  .modal-note { color: #666; font-size: 12px; margin-top: 12px; }
+  .btn-ghost.hidden { display: none; }
+
+  /* cloud auth / account */
+  .auth-stack input { width: 100%; margin-bottom: 8px; }
+  .auth-stack button { width: 100%; margin-bottom: 8px; }
+  .auth-alt { font-size: 12.5px; color: #8b8680; margin-top: 8px; text-align: center; }
+  .auth-alt a { color: var(--accent); cursor: pointer; }
+  .cloud-who { font-size: 13px; color: var(--text); margin-bottom: 10px; }
+  .cloud-code {
+    background: var(--bg3);
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12.5px;
+    margin-bottom: 10px;
+    word-break: break-all;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .cloud-code .code-text { color: var(--accent); font-weight: bold; }
+  .cloud-code button { margin-left: auto; flex: none; }
+  #cloudMembers:empty { display: none; }
+  #syncState { font-size: 12px; }
+  #syncState.hidden { display: none; }
+  .sync-synced { color: var(--win); }
+  .sync-saving { color: #8b8680; }
+  .sync-offline { color: var(--loss); }
+  #viewAsBanner {
+    max-width: 1100px;
+    margin: 10px auto 0;
+    padding: 8px 20px;
+    font-size: 13.5px;
+    color: var(--text-bright);
+    background: rgba(56, 147, 232, .12);
+    border: 1px solid #3893e8;
+    border-radius: 8px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  #viewAsBanner.hidden { display: none; }
+  #viewAsBanner button { margin-left: auto; }
+  @media (max-width: 860px) {
+    .app { flex-direction: column; }
+    #sidepanel {
+      position: static;
+      width: auto;
+      flex: none;
+      height: auto;
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+    }
+  }
+  .view-toggle button {
+    background: var(--bg3);
+    color: var(--text);
+    font-weight: normal;
+    padding: 6px 14px;
+    border-radius: 6px 0 0 6px;
+    font-size: 13px;
+  }
+  .view-toggle button:last-child { border-radius: 0 6px 6px 0; }
+  .view-toggle button.active { background: var(--accent); color: #161512; font-weight: bold; }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 14px;
+    padding: 4px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    user-select: none;
+  }
+  .chip.filter-chip { background: var(--bg3); color: var(--text); }
+  .chip.filter-chip.active { border-color: currentColor; font-weight: bold; }
+  .chip .x { cursor: pointer; opacity: .7; font-weight: bold; }
+  .chip .x:hover { opacity: 1; }
+  #status {
+    max-width: 1100px;
+    margin: 16px auto 0;
+    padding: 0 20px;
+    min-height: 22px;
+    font-size: 14px;
+  }
+  #status.error { color: var(--loss); }
+  main {
+    max-width: 1100px;
+    margin: 10px auto 40px;
+    padding: 0 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  main.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    align-items: start;
+  }
+  .game-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .list-row { display: flex; gap: 14px; }
+  .list-thumb {
+    flex: 0 0 76px;
+    width: 76px;
+    height: 76px;
+    border-radius: 6px;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  .list-thumb svg { display: block; width: 100%; height: 100%; }
+  .list-content { flex: 1; min-width: 0; }
+  .list-content .game-top, .list-content .players, .list-content .opening, .list-content .game-bottom { margin-bottom: 6px; }
+  .game-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .badge {
+    font-size: 12px;
+    font-weight: bold;
+    padding: 2px 10px;
+    border-radius: 12px;
+    color: #fff;
+  }
+  .badge.win  { background: var(--win); }
+  .badge.loss { background: var(--loss); }
+  .badge.draw { background: var(--draw); }
+  .badge.unknown { background: var(--bg3); color: var(--text); }
+  .meta { font-size: 13px; color: #8b8680; }
+  .players {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    font-size: 15px;
+    color: var(--text-bright);
+    margin-bottom: 6px;
+  }
+  .players .vs { color: #666; font-size: 12px; }
+  .players .rating { color: #8b8680; font-size: 13px; margin-left: 4px; }
+  .players .diff { font-size: 12px; margin-left: 2px; }
+  .diff.up { color: var(--win); }
+  .diff.down { color: var(--loss); }
+  .me { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+  .opening { font-size: 13px; color: var(--accent); margin-bottom: 10px; }
+  .opening .eco { color: #8b8680; margin-right: 6px; }
+  .game-bottom {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .game-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    border-radius: 12px;
+    padding: 3px 10px;
+    font-size: 12.5px;
+    color: #161512;
+    font-weight: bold;
+  }
+  .tag-chip .x { cursor: pointer; opacity: .6; }
+  .tag-chip .x:hover { opacity: 1; }
+  .add-tag { display: inline-flex; align-items: center; gap: 4px; }
+  .add-tag input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-bright);
+    border-radius: 12px;
+    padding: 3px 10px;
+    font-size: 12.5px;
+    width: 110px;
+    outline: none;
+  }
+  .add-tag input:focus { border-color: var(--accent); }
+  .add-tag .add-btn {
+    background: var(--bg3);
+    color: var(--text-bright);
+    border: none;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    font-size: 15px;
+    line-height: 1;
+    padding: 0;
+    cursor: pointer;
+  }
+  .spacer { flex: 1; }
+  a.lichess-link {
+    color: var(--text);
+    font-size: 13px;
+    text-decoration: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    white-space: nowrap;
+  }
+  a.lichess-link:hover { border-color: var(--accent); color: var(--accent); }
+  a.lichess-icon {
+    margin-left: auto;
+    color: #8b8680;
+    text-decoration: none;
+    font-size: 16px;
+    padding: 0 2px;
+  }
+  a.lichess-icon:hover { color: var(--accent); }
+
+  /* grid cards */
+  .grid-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+  .thumb-wrap { position: relative; cursor: pointer; }
+  .thumb-wrap svg { display: block; width: 100%; height: auto; }
+  .thumb-wrap:hover .thumb-move { background: var(--accent); color: #161512; }
+  .thumb-wrap .badge { position: absolute; top: 8px; left: 8px; }
+  .thumb-move {
+    position: absolute;
+    bottom: 6px;
+    right: 8px;
+    background: rgba(0, 0, 0, .65);
+    color: #fff;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    pointer-events: none;
+  }
+  .grid-info { padding: 10px 12px 4px; font-size: 13px; }
+  .grid-info .players { font-size: 13.5px; margin-bottom: 3px; gap: 6px; }
+  .grid-info .meta { margin-bottom: 3px; display: block; }
+  .grid-card .opening {
+    margin: 0 0 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .grid-foot {
+    margin-top: auto;
+    padding: 6px 12px 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .grid-foot .add-tag input { width: 84px; }
+
+  /* thumbnail picker modal */
+  .modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, .72);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .modal.hidden { display: none; }
+  .modal-box {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    width: min(430px, 94vw);
+    max-height: 94vh;
+    overflow: auto;
+  }
+  .modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    color: var(--text-bright);
+    font-weight: bold;
+    font-size: 15px;
+  }
+  .modal-head button {
+    background: none;
+    color: var(--text);
+    font-size: 20px;
+    padding: 0 6px;
+  }
+  .modal-board { width: 100%; border-radius: 8px; overflow: hidden; }
+  .modal-board svg { display: block; width: 100%; height: auto; }
+  .modal-controls { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  .modal-controls button {
+    background: var(--bg3);
+    color: var(--text-bright);
+    padding: 6px 10px;
+  }
+  .modal-controls input[type="range"] { flex: 1; accent-color: var(--accent); }
+  .modal-label { margin-top: 10px; text-align: center; color: var(--accent); font-size: 14px; }
+  .modal-hint { text-align: center; color: #666; font-size: 12px; margin-top: 4px; }
+
+  .empty {
+    text-align: center;
+    padding: 50px 20px;
+    color: #8b8680;
+    font-size: 15px;
+  }
+  .empty .knight { font-size: 44px; display: block; margin-bottom: 12px; }
+  footer {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 20px 30px;
+    font-size: 12.5px;
+    color: #666;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  footer a { color: #888; cursor: pointer; text-decoration: underline; }
+  footer a:hover { color: var(--accent); }
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    vertical-align: -2px;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  datalist { display: none; }
+</style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+</head>
+<body>
+
+<div class="app">
+
+<aside id="sidepanel">
+  <div class="panel-head"><span>Players</span><button type="button" id="addPlayerBtn" class="head-btn" title="Load games for a player">+</button></div>
+  <div id="playerList"></div>
+  <div class="panel-head second"><span>Tag list</span></div>
+  <div class="panel-actions">
+    <button type="button" id="addFolderBtn">+ Folder</button>
+    <button type="button" id="addTagBtn">+ Tag</button>
+  </div>
+  <div id="tagTree" class="tree"></div>
+</aside>
+
+<div id="content">
+
+<header>
+  <div class="header-row">
+    <h1>&#9822; Lichess <span>Tagged Games</span></h1>
+    <form id="fetchForm">
+      <input type="text" id="username" placeholder="Lichess username" autocomplete="off">
+      <select id="count" title="Number of games to load">
+        <option>10</option>
+        <option>20</option>
+        <option selected>50</option>
+        <option>100</option>
+      </select>
+      <select id="loadColor" title="Load only games played with this colour">
+        <option value="">Any colour</option>
+        <option value="white">As White</option>
+        <option value="black">As Black</option>
+      </select>
+      <select id="loadResult" title="Load only games with this result for you">
+        <option value="">Any result</option>
+        <option value="win">Wins</option>
+        <option value="loss">Losses</option>
+        <option value="draw">Draws</option>
+      </select>
+      <input type="number" id="loadMinRating" placeholder="Min opp rating" min="0" step="100"
+             title="Load only games against opponents rated at least this (empty = any)">
+      <button type="submit" id="loadBtn">Load games</button>
+    </form>
+    <button type="button" id="profileBtn" class="btn-ghost" title="Log in">Log in</button>
+    <span id="syncState" class="hidden" title=""></span>
+  </div>
+</header>
+
+<div class="toolbar">
+  <input type="text" id="search" placeholder="Search player / opening...">
+  <select id="speedFilter">
+    <option value="all">All speeds</option>
+    <option>ultraBullet</option>
+    <option>bullet</option>
+    <option>blitz</option>
+    <option>rapid</option>
+    <option>classical</option>
+    <option>correspondence</option>
+  </select>
+  <select id="datePreset" title="Date range">
+    <option value="all">All dates</option>
+    <option value="7d">Last 7 days</option>
+    <option value="30d">Last 30 days</option>
+    <option value="90d">Last 90 days</option>
+    <option value="year">This year</option>
+    <option value="custom">Custom range</option>
+  </select>
+  <input type="date" id="dateFrom" title="From date">
+  <input type="date" id="dateTo" title="To date">
+  <select id="openingFilter" title="Opening">
+    <option value="all">All openings</option>
+  </select>
+  <button type="button" id="clearFilters" class="btn-ghost">Clear</button>
+  <button type="button" id="toggleTags" class="btn-ghost" title="Show or hide tags on the game cards">Tags</button>
+  <button type="button" id="toggleNotes" class="btn-ghost" title="Show or hide notes on the game cards">Notes</button>
+  <div id="tagFilters" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+  <span id="filterInfo"></span>
+  <div class="view-toggle">
+    <button type="button" id="viewGrid">Grid</button>
+    <button type="button" id="viewList">List</button>
+  </div>
+</div>
+
+  <div id="viewAsBanner" class="hidden">
+    <span>Viewing <b id="viewAsName"></b>'s annotations (read-only)</span>
+    <button type="button" id="viewAsBack" class="btn-ghost">Back to mine</button>
+  </div>
+
+  <div id="status"></div>
+
+<main id="games"></main>
+
+<footer>
+  <span>Click any board to choose which position is used as its thumbnail.</span>
+  <span>Header filters (colour, result, min rating) choose which games get loaded; toolbar filters only narrow the list.</span>
+  <span>Click tags in the sidepanel to filter; drag them between folders to reorganize.</span>
+  <span>Tags &amp; thumbnails are saved in this browser.</span>
+  <a id="exportBtn">Export tags</a>
+  <a id="importBtn">Import tags</a>
+  <input type="file" id="importFile" accept=".json" style="display:none">
+</footer>
+
+</div>
+</div>
+
+<div id="profileModal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span id="profileModalTitle">Log in</span>
+      <button type="button" id="profileModalClose" title="Close">&times;</button>
+    </div>
+    <div id="profileList"></div>
+    <div id="pinRow" class="pin-row hidden">
+      <input type="password" id="pinInput" placeholder="PIN">
+      <button type="button" id="pinGo">Log in</button>
+    </div>
+    <div class="modal-error" id="profileError"></div>
+    <div id="cloudAuth" class="hidden">
+      <div id="authSignin" class="auth-stack">
+        <input type="email" id="authEmail" placeholder="Email" autocomplete="username">
+        <input type="password" id="authPass" placeholder="Password" autocomplete="current-password">
+        <button type="button" id="authSigninBtn">Sign in</button>
+        <div class="auth-alt">No account yet? <a href="#" id="authToSignup">Create one</a></div>
+      </div>
+      <div id="authSignup" class="auth-stack hidden">
+        <input type="text" id="suName" placeholder="Your name">
+        <input type="email" id="suEmail" placeholder="Email" autocomplete="username">
+        <input type="password" id="suPass" placeholder="Password (min. 6 characters)" autocomplete="new-password">
+        <input type="text" id="suCode" placeholder="Workspace code (empty = create your own as coach)">
+        <button type="button" id="authSignupBtn">Create account</button>
+        <div class="auth-alt">Already registered? <a href="#" id="authToSignin">Sign in</a></div>
+      </div>
+    </div>
+    <div id="cloudMenu" class="hidden">
+      <div id="cloudWho" class="cloud-who"></div>
+      <div id="cloudCodeRow" class="cloud-code hidden"></div>
+      <div id="cloudMembers"></div>
+      <div id="cloudJoin" class="auth-stack hidden">
+        <input type="text" id="joinCode" placeholder="Workspace code">
+        <button type="button" id="joinBtn">Join workspace</button>
+        <button type="button" id="createWsBtn" class="btn-ghost">Create my own workspace</button>
+      </div>
+      <button type="button" id="cloudSignout" class="btn-ghost">Sign out</button>
+    </div>
+    <div id="coachTools" class="coach-form hidden">
+      <input type="text" id="newStudentName" placeholder="Student name">
+      <input type="password" id="newStudentPin" placeholder="PIN (optional)">
+      <button type="button" id="addStudentBtn">+ Add student</button>
+    </div>
+    <div id="logoutRow" style="margin-top:12px;">
+      <button type="button" id="logoutBtn" class="btn-ghost hidden">Log out</button>
+    </div>
+    <div class="modal-note" id="localNote">Profiles keep separate tags, thumbnails and player lists in this browser. The coach can add student profiles and manage PINs. Clearing the browser's site data removes everything.</div>
+  </div>
+</div>
+
+<div id="thumbModal" class="modal hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span>Choose thumbnail position</span>
+      <button type="button" id="modalClose" title="Close">&times;</button>
+    </div>
+    <div class="modal-board" id="modalBoard"></div>
+    <div class="modal-controls">
+      <button type="button" id="modalPrev" title="Previous move">&#9664;</button>
+      <input type="range" id="modalSlider" min="0" max="0" value="0">
+      <button type="button" id="modalNext" title="Next move">&#9654;</button>
+    </div>
+    <div class="modal-label" id="modalLabel"></div>
+    <div class="modal-hint">Use the slider, &#9664; &#9654; buttons or arrow keys. Your choice saves automatically.</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var TAGS_KEY = 'lichess-game-tags-v1';
+  var THUMBS_KEY = 'lichess-game-thumbs-v1';
+  var TREE_KEY = 'lichess-tag-tree-v1';
+  var FOLDERS_OPEN_KEY = 'lichess-tag-folders-open-v1';
+  var VIEW_KEY = 'lichess-view-mode';
+  var USER_KEY = 'lichess-username';
+  var ACCOUNTS_KEY = 'lichess-player-accounts-v1';
+  var NOTES_KEY = 'lichess-game-notes-v1';
+  var PROFILES_KEY = 'lichess-profiles-v1';
+  var SESSION_KEY = 'lichess-profile-session-v1';
+  var SHOW_TAGS_KEY = 'lichess-show-card-tags';
+  var SHOW_NOTES_KEY = 'lichess-show-card-notes';
+  var LEGACY_KEYS = [TAGS_KEY, THUMBS_KEY, TREE_KEY, USER_KEY];
+
+  var gameTags = {};
+  var gameThumbs = {};
+  var gameNotes = {};
+  var games = [];
+  var currentUsername = '';
+  var activeTagFilters = [];
+  var searchTerm = '';
+  var speedFilter = 'all';
+  var accounts = [];
+  var profiles = [];
+  var profile = null;
+  var pendingProfile = null;
+  var showCardTags = localStorage.getItem(SHOW_TAGS_KEY) !== '0';
+  var showCardNotes = localStorage.getItem(SHOW_NOTES_KEY) !== '0';
+  var viewMode = localStorage.getItem(VIEW_KEY) || 'grid';
+
+  var SB = null;
+  try {
+    if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY &&
+        typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+      SB = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+    }
+  } catch (e) { SB = null; }
+  var CLOUD_KEYS = ['tags', 'notes', 'thumbs', 'tree', 'accounts'];
+  var cloudView = 'signin';
+  var cloudUser = null;
+  var cloudMembers = [];
+  var cloudViewingId = null;
+  var cloudWorkspace = { id: null, name: '' };
+  var cloudDirty = {};
+  var cloudTimer = null;
+
+  var tree = { nodes: [] };
+  var openFolders = {};
+  var dragNodeId = null;
+
+  var GLYPHS = { k: '\u265A', q: '\u265B', r: '\u265C', b: '\u265D', n: '\u265E', p: '\u265F' };
+  var PIECE_FONT = '"DejaVu Sans", "Segoe UI Symbol", "Noto Sans Symbols 2", sans-serif';
+
+  // ---------- storage ----------
+  function loadJSON(key) {
+    try { return JSON.parse(localStorage.getItem(key)); }
+    catch (e) { return null; }
+  }
+  function dataOwnerId() { return (SB && cloudViewingId) ? cloudViewingId : profile.id; }
+  function dataReadOnly() {
+    return !!(SB && profile && profile.cloud && cloudViewingId && cloudViewingId !== profile.id);
+  }
+  function pkey(base) { return base + '.' + dataOwnerId(); }
+  function saveTags() {
+    if (dataReadOnly()) return;
+    localStorage.setItem(pkey(TAGS_KEY), JSON.stringify(gameTags));
+    cloudTouch('tags');
+  }
+  function saveThumbs() {
+    if (dataReadOnly()) return;
+    localStorage.setItem(pkey(THUMBS_KEY), JSON.stringify(gameThumbs));
+    cloudTouch('thumbs');
+  }
+  function saveAccounts() {
+    if (dataReadOnly()) return;
+    localStorage.setItem(pkey(ACCOUNTS_KEY), JSON.stringify(accounts));
+    cloudTouch('accounts');
+  }
+  function saveNotes() {
+    if (dataReadOnly()) return;
+    localStorage.setItem(pkey(NOTES_KEY), JSON.stringify(gameNotes));
+    cloudTouch('notes');
+  }
+  function noteFor(id) { return gameNotes[id] || ''; }
+  function setNote(id, text) {
+    if (dataReadOnly()) return;
+    if (text && text.trim()) gameNotes[id] = text;
+    else delete gameNotes[id];
+    saveNotes();
+  }
+  function normTag(t) { return t.trim().replace(/\s+/g, ' ').toLowerCase(); }
+  function tagsFor(id) { return gameTags[id] || []; }
+  function addTag(id, raw) {
+    if (dataReadOnly()) return false;
+    var t = normTag(raw);
+    if (!t) return false;
+    var list = gameTags[id] || (gameTags[id] = []);
+    if (list.some(function (x) { return x.toLowerCase() === t; })) return false;
+    list.push(t);
+    saveTags();
+    return true;
+  }
+  function removeTag(id, tag) {
+    if (dataReadOnly()) return;
+    var list = gameTags[id] || [];
+    gameTags[id] = list.filter(function (x) { return x !== tag; });
+    if (!gameTags[id].length) delete gameTags[id];
+    saveTags();
+  }
+  function allKnownTags() {
+    var set = {};
+    tree.nodes.forEach(function (n) {
+      if (n.type === 'tag') set[n.name.toLowerCase()] = n.name;
+    });
+    Object.keys(gameTags).forEach(function (id) {
+      gameTags[id].forEach(function (t) { set[t.toLowerCase()] = t; });
+    });
+    return Object.keys(set).sort();
+  }
+
+  var PALETTE = ['#d18f00', '#3893e8', '#7fa650', '#c66d95', '#9a76c9', '#4dab9d', '#d9773f', '#b0b047'];
+  function tagColor(tag) {
+    var h = 0;
+    for (var i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
+    return PALETTE[h % PALETTE.length];
+  }
+
+  // ---------- profiles / login ----------
+  function pinHash(p) {
+    var h = 5381;
+    for (var i = 0; i < p.length; i++) h = ((h << 5) + h + p.charCodeAt(i)) >>> 0;
+    return h.toString(36);
+  }
+  function saveProfiles() { localStorage.setItem(PROFILES_KEY, JSON.stringify({ list: profiles })); }
+  function loadProfiles() {
+    var reg = loadJSON(PROFILES_KEY);
+    if (reg && Array.isArray(reg.list) && reg.list.length) return reg.list;
+    var list = [{ id: 'coach', name: 'Coach', role: 'coach', pin: null }];
+    LEGACY_KEYS.forEach(function (base) {
+      var v = localStorage.getItem(base);
+      if (v !== null) localStorage.setItem(base + '.coach', v);
+    });
+    localStorage.setItem(PROFILES_KEY, JSON.stringify({ list: list }));
+    return list;
+  }
+  function profileById(id) {
+    for (var i = 0; i < profiles.length; i++) {
+      if (profiles[i].id === id) return profiles[i];
+    }
+    return null;
+  }
+  function setSession(p) { localStorage.setItem(SESSION_KEY, JSON.stringify({ pid: p.id, at: Date.now() })); }
+  function clearSession() { localStorage.removeItem(SESSION_KEY); }
+  function loggedInProfile() {
+    var s = loadJSON(SESSION_KEY);
+    return (s && profileById(s.pid)) || null;
+  }
+  function loadProfileData(p) {
+    profile = p;
+    gameTags = loadJSON(pkey(TAGS_KEY)) || {};
+    gameThumbs = loadJSON(pkey(THUMBS_KEY)) || {};
+    gameNotes = loadJSON(pkey(NOTES_KEY)) || {};
+    openFolders = loadJSON(FOLDERS_OPEN_KEY) || {};
+    accounts = loadJSON(pkey(ACCOUNTS_KEY)) || [];
+    tree = loadTree();
+    ensureUsedTagsInTree();
+    games = [];
+    currentUsername = '';
+    resetToolbarFilters();
+    document.getElementById('username').value = localStorage.getItem(pkey(USER_KEY)) || '';
+    renderProfileBtn();
+    render();
+  }
+  function login(p) {
+    setSession(p);
+    loadProfileData(p);
+    closeProfileModal();
+  }
+  function logout() {
+    clearSession();
+    profile = null;
+    gameTags = {};
+    gameThumbs = {};
+    gameNotes = {};
+    tree = { nodes: [] };
+    accounts = [];
+    games = [];
+    currentUsername = '';
+    activeTagFilters = [];
+    renderProfileBtn();
+    render();
+    openProfileModal(true);
+  }
+  function resetToolbarFilters() {
+    searchTerm = '';
+    speedFilter = 'all';
+    activeTagFilters = [];
+    document.getElementById('search').value = '';
+    document.getElementById('speedFilter').value = 'all';
+    document.getElementById('datePreset').value = 'all';
+    document.getElementById('dateFrom').value = '';
+    document.getElementById('dateTo').value = '';
+    document.getElementById('openingFilter').value = 'all';
+  }
+  function renderProfileBtn() {
+    var b = document.getElementById('profileBtn');
+    b.textContent = profile ? profile.name : (SB ? 'Sign in' : 'Log in');
+    if (profile) {
+      b.title = profile.cloud
+        ? 'Account (' + profile.role + (cloudViewingId ? ', viewing another member' : '') + ')'
+        : 'Switch profile or log out (signed in as ' + profile.role + ')';
+    } else {
+      b.title = SB ? 'Sign in' : 'Log in';
+    }
+  }
+  function addAccount(name) {
+    var l = name.toLowerCase();
+    accounts = accounts.filter(function (a) { return a.name.toLowerCase() !== l; });
+    accounts.unshift({ name: name, at: Date.now() });
+    if (accounts.length > 30) accounts.length = 30;
+    saveAccounts();
+    renderPlayers();
+  }
+  function removeAccount(name) {
+    var l = name.toLowerCase();
+    accounts = accounts.filter(function (a) { return a.name.toLowerCase() !== l; });
+    saveAccounts();
+    renderPlayers();
+  }
+
+  // ---------- chess: apply SAN moves to track positions ----------
+  function fileOf(c) { return c.charCodeAt(0) - 97; }
+  function rankOf(c) { return c.charCodeAt(0) - 49; }
+  function sq(f, r) { return r * 8 + f; }
+  function sqFromName(s) { return sq(fileOf(s[0]), rankOf(s[1])); }
+  function isWhitePiece(p) { return p >= 'A' && p <= 'Z'; }
+
+  function initialBoard() {
+    var rows = ['RNBQKBNR', 'PPPPPPPP',
+      '........', '........', '........', '........',
+      'pppppppp', 'rnbqkbnr'];
+    return rows.join('').replace(/\./g, '\u0000').split('');
+  }
+
+  function pathClear(b, from, to) {
+    var df = Math.sign((to & 7) - (from & 7));
+    var dr = Math.sign((to >> 3) - (from >> 3));
+    var f = (from & 7) + df, r = (from >> 3) + dr;
+    while (f !== (to & 7) || r !== (to >> 3)) {
+      if (b[r * 8 + f] && b[r * 8 + f] !== '\u0000') return false;
+      f += df; r += dr;
+    }
+    return true;
+  }
+
+  function canReach(b, from, dest, piece, white, ep, isCapture) {
+    if (from === dest) return false;
+    var target = b[dest];
+    if (target && target !== '\u0000' && isWhitePiece(target) === white) return false;
+    var df = (dest & 7) - (from & 7);
+    var dr = (dest >> 3) - (from >> 3);
+    switch (piece) {
+      case 'N':
+        return (Math.abs(df) === 1 && Math.abs(dr) === 2) || (Math.abs(df) === 2 && Math.abs(dr) === 1);
+      case 'K':
+        return Math.max(Math.abs(df), Math.abs(dr)) === 1;
+      case 'B':
+        return Math.abs(df) === Math.abs(dr) && pathClear(b, from, dest);
+      case 'R':
+        return (df === 0 || dr === 0) && pathClear(b, from, dest);
+      case 'Q':
+        return (Math.abs(df) === Math.abs(dr) || df === 0 || dr === 0) && pathClear(b, from, dest);
+      case 'P': {
+        var dir = white ? 1 : -1;
+        if (isCapture) {
+          if (Math.abs(df) !== 1 || dr !== dir) return false;
+          var target = b[dest];
+          if (target && target !== '\u0000' && isWhitePiece(target) !== white) return true;
+          if ((!target || target === '\u0000') && ep === dest) return true;
+          return false;
+        }
+        if (df !== 0) return false;
+        if (dr === dir && (!b[dest] || b[dest] === '\u0000')) return true;
+        var startRank = white ? 1 : 6;
+        var midSq = sq(from & 7, (from >> 3) + dir);
+        if (dr === 2 * dir && (from >> 3) === startRank &&
+            (!b[dest] || b[dest] === '\u0000') && (!b[midSq] || b[midSq] === '\u0000')) return true;
+        return false;
+      }
+    }
+    return false;
+  }
+
+  function applySan(board, white, ep, san) {
+    var b = board.slice();
+    var m, rank;
+    if ((m = san.match(/^(?:O-O-O|0-0-0)$/))) {
+      rank = white ? 0 : 7;
+      b[sq(2, rank)] = b[sq(4, rank)]; b[sq(4, rank)] = '\u0000';
+      b[sq(3, rank)] = b[sq(0, rank)]; b[sq(0, rank)] = '\u0000';
+      return { board: b, from: sq(4, rank), to: sq(2, rank), ep: null };
+    }
+    if ((m = san.match(/^(?:O-O|0-0)$/))) {
+      rank = white ? 0 : 7;
+      b[sq(6, rank)] = b[sq(4, rank)]; b[sq(4, rank)] = '\u0000';
+      b[sq(5, rank)] = b[sq(7, rank)]; b[sq(7, rank)] = '\u0000';
+      return { board: b, from: sq(4, rank), to: sq(6, rank), ep: null };
+    }
+    m = san.match(/^([KQRBN])?([a-h])?([1-8])?(x)?([a-h][1-8])(?:=?([QRBN]))?$/);
+    if (!m) return null;
+    var piece = m[1] || 'P';
+    var dFile = m[2], dRank = m[3];
+    var isCapture = !!m[4];
+    var dest = sqFromName(m[5]);
+    var promo = m[6];
+    var pu = piece.toUpperCase();
+    var candidates = [];
+    for (var i = 0; i < 64; i++) {
+      var p = b[i];
+      if (!p || p === '\u0000') continue;
+      if (isWhitePiece(p) !== white) continue;
+      if (p.toUpperCase() !== pu) continue;
+      if (dFile && (i & 7) !== fileOf(dFile)) continue;
+      if (dRank && (i >> 3) !== rankOf(dRank)) continue;
+      if (!canReach(b, i, dest, pu, white, ep, isCapture)) continue;
+      candidates.push(i);
+    }
+    if (!candidates.length) return null;
+    var from = candidates[0];
+    var newEp = null;
+    var destWasEmpty = !b[dest] || b[dest] === '\u0000';
+    b[dest] = promo ? (white ? promo : promo.toLowerCase()) : b[from];
+    b[from] = '\u0000';
+    if (pu === 'P') {
+      var fDiff = Math.abs((dest & 7) - (from & 7));
+      if (fDiff === 1 && destWasEmpty) {
+        var capRank = white ? (dest >> 3) - 1 : (dest >> 3) + 1;
+        b[sq(dest & 7, capRank)] = '\u0000';
+      }
+      if (Math.abs((dest >> 3) - (from >> 3)) === 2) {
+        newEp = sq(from & 7, (from >> 3) + (white ? 1 : -1));
+      }
+    }
+    return { board: b, from: from, to: dest, ep: newEp };
+  }
+
+  function parseGame(movesStr) {
+    var states = [{ board: initialBoard(), from: null, to: null }];
+    if (!movesStr || !movesStr.trim()) return states;
+    var toks = movesStr.trim().split(/\s+/);
+    var board = states[0].board;
+    var white = true;
+    var ep = null;
+    for (var i = 0; i < toks.length; i++) {
+      var tok = toks[i].replace(/[+#!?]/g, '');
+      if (!tok || tok === '...' || /^\d+\.+$/.test(tok) || /^\$\d+$/.test(tok)) continue;
+      var r = applySan(board, white, ep, tok);
+      if (!r) {
+        states.push({ board: board.slice(), from: null, to: null });
+        continue;
+      }
+      board = r.board;
+      white = !white;
+      ep = r.ep;
+      states.push({ board: board.slice(), from: r.from, to: r.to });
+    }
+    return states;
+  }
+
+  function getStates(g) {
+    if (!g._states) g._states = parseGame(g.moves);
+    return g._states;
+  }
+  function maxPly(g) { return getStates(g).length - 1; }
+  function thumbPly(g) {
+    var mx = maxPly(g);
+    var stored = gameThumbs[g.id];
+    if (stored === undefined || stored === null || stored < 0 || stored > mx) return mx;
+    return stored;
+  }
+  function moveLabel(g, ply) {
+    if (ply === 0) return 'Start position';
+    var toks = (g.moves || '').trim().split(/\s+/);
+    var san = toks[ply - 1] || '';
+    var num = Math.ceil(ply / 2);
+    return 'After ' + (ply % 2 ? num + '. ' : num + '... ') + san;
+  }
+
+  // ---------- board SVG ----------
+  function boardSVG(board, fromSq, toSq) {
+    var NS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 8 8');
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    for (var r = 0; r < 8; r++) {
+      for (var f = 0; f < 8; f++) {
+        var rect = document.createElementNS(NS, 'rect');
+        rect.setAttribute('x', f); rect.setAttribute('y', r);
+        rect.setAttribute('width', 1); rect.setAttribute('height', 1);
+        rect.setAttribute('fill', (r + f) % 2 ? '#b58863' : '#f0d9b5');
+        svg.appendChild(rect);
+      }
+    }
+    [fromSq, toSq].forEach(function (s) {
+      if (s === null || s === undefined) return;
+      var hl = document.createElementNS(NS, 'rect');
+      hl.setAttribute('x', s & 7); hl.setAttribute('y', s >> 3);
+      hl.setAttribute('width', 1); hl.setAttribute('height', 1);
+      hl.setAttribute('fill', 'rgba(246, 246, 105, 0.55)');
+      svg.appendChild(hl);
+    });
+    for (var i = 0; i < 64; i++) {
+      var p = board[i];
+      if (!p || p === '\u0000') continue;
+      var t = document.createElementNS(NS, 'text');
+      t.setAttribute('x', (i & 7) + 0.5);
+      t.setAttribute('y', (i >> 3) + 0.52);
+      t.setAttribute('text-anchor', 'middle');
+      t.setAttribute('dominant-baseline', 'central');
+      t.setAttribute('font-size', '0.82');
+      t.setAttribute('font-family', PIECE_FONT);
+      var whitePiece = isWhitePiece(p);
+      t.setAttribute('fill', whitePiece ? '#ffffff' : '#262421');
+      if (whitePiece) {
+        t.setAttribute('stroke', '#312e2b');
+        t.setAttribute('stroke-width', '0.045');
+        t.setAttribute('paint-order', 'stroke');
+      }
+      t.textContent = GLYPHS[p.toLowerCase()];
+      svg.appendChild(t);
+    }
+    return svg;
+  }
+
+  // ---------- fetch games ----------
+  function setStatus(msg, isError, loading) {
+    var elx = document.getElementById('status');
+    elx.className = isError ? 'error' : '';
+    elx.innerHTML = '';
+    if (!msg) return;
+    if (loading) {
+      var sp = document.createElement('span');
+      sp.className = 'spinner';
+      elx.appendChild(sp);
+    }
+    elx.appendChild(document.createTextNode(msg));
+  }
+
+  var SCAN_BATCH = 100;
+  var SCAN_LIMIT = 5000;
+
+  function parseNdjson(text) {
+    var lines = text.trim() ? text.trim().split('\n') : [];
+    return lines.map(function (l) { return JSON.parse(l); });
+  }
+
+  function gameMatchesLoadFilters(g, username, opts) {
+    if (opts.result && userResult(g, username) !== opts.result) return false;
+    if (opts.minRating !== null) {
+      var opp = opponentOf(g, username);
+      if (!opp || typeof opp.rating !== 'number' || opp.rating < opts.minRating) return false;
+    }
+    return true;
+  }
+
+  function fetchGames(username, max, opts) {
+    max = parseInt(max, 10) || 50;
+    var needScan = !!opts.result || opts.minRating !== null;
+    setStatus('Loading games for "' + username + '"...', false, true);
+    document.getElementById('loadBtn').disabled = true;
+
+    function getBatch(params) {
+      var qs = ['max=' + params.max];
+      if (opts.color) qs.push('color=' + opts.color);
+      if (params.until !== undefined) qs.push('until=' + params.until);
+      return fetch('https://lichess.org/api/games/user/' + encodeURIComponent(username) + '?' + qs.join('&'), {
+        headers: { Accept: 'application/x-ndjson' }
+      })
+        .then(function (res) {
+          if (!res.ok) {
+            if (res.status === 404) throw new Error('User "' + username + '" not found on Lichess.');
+            throw new Error('Lichess API error (HTTP ' + res.status + ').');
+          }
+          return res.text();
+        })
+        .then(parseNdjson);
+    }
+
+    function fail(err) {
+      setStatus(err.message || 'Failed to load games. Check your connection.', true, false);
+      document.getElementById('loadBtn').disabled = false;
+    }
+
+    function done(list, scanned) {
+      games = list.slice(0, max);
+      currentUsername = username;
+      localStorage.setItem(pkey(USER_KEY), username);
+      addAccount(username);
+      activeTagFilters = [];
+      populateOpeningFilter();
+      render();
+      if (games.length) {
+        var msg = 'Loaded ' + games.length + ' game' + (games.length > 1 ? 's' : '') + '.';
+        if (needScan && scanned > games.length) {
+          msg += ' Scanned ' + scanned + ' games to match your load filters.';
+          if (scanned >= SCAN_LIMIT && games.length < max) msg += ' Scan limit reached.';
+        }
+        setStatus(msg, false, false);
+      } else if (scanned > 0) {
+        setStatus('No games match the load filters (scanned ' + scanned + ' games' +
+          (scanned >= SCAN_LIMIT ? ', scan limit reached' : '') + ').', false, false);
+      } else {
+        setStatus('No games found for "' + username + '".', false, false);
+      }
+      document.getElementById('loadBtn').disabled = false;
+    }
+
+    if (!needScan) {
+      return getBatch({ max: max })
+        .then(function (batch) { done(batch, batch.length); })
+        .catch(fail);
+    }
+
+    var collected = [];
+    var seen = {};
+    var scanned = 0;
+    var until = null;
+
+    return (function step() {
+      var params = { max: SCAN_BATCH };
+      if (until !== null) params.until = until;
+      return getBatch(params).then(function (batch) {
+        var oldest = null;
+        for (var i = 0; i < batch.length; i++) {
+          var g = batch[i];
+          var endTs = g.lastMoveAt || g.createdAt;
+          if (oldest === null || endTs < oldest) oldest = endTs;
+          if (seen[g.id]) continue;
+          seen[g.id] = 1;
+          if (gameMatchesLoadFilters(g, username, opts)) collected.push(g);
+        }
+        scanned += batch.length;
+        if (oldest !== null && (until === null || oldest - 1 < until)) until = oldest - 1;
+        if (collected.length >= max || batch.length < params.max || scanned >= SCAN_LIMIT) {
+          done(collected, scanned);
+          return;
+        }
+        setStatus('Scanning older games... ' + scanned + ' checked, ' +
+          collected.length + ' match.', false, true);
+        return step();
+      });
+    })().catch(fail);
+  }
+
+  // ---------- rendering ----------
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  function playerName(p) {
+    return (p && p.user && p.user.name) || (p && p.aiLevel ? 'A.I. level ' + p.aiLevel : 'Anonymous');
+  }
+
+  function gameHaystack(g) {
+    return [
+      playerName(g.players.white), playerName(g.players.black),
+      g.opening ? g.opening.name : '', g.speed, g.perf,
+      noteFor(g.id)
+    ];
+  }
+
+  function userResult(g, username) {
+    var u = (username || currentUsername).toLowerCase();
+    if (!u) return null;
+    var isWhite = g.players.white.user && g.players.white.user.name.toLowerCase() === u;
+    var isBlack = g.players.black.user && g.players.black.user.name.toLowerCase() === u;
+    if (!isWhite && !isBlack) return null;
+    if (g.winner === 'white') return isWhite ? 'win' : 'loss';
+    if (g.winner === 'black') return isBlack ? 'win' : 'loss';
+    return 'draw';
+  }
+
+  function opponentOf(g, username) {
+    var u = (username || currentUsername).toLowerCase();
+    function isMe(p) { return p && p.user && p.user.name.toLowerCase() === u; }
+    if (isMe(g.players.white)) return g.players.black;
+    if (isMe(g.players.black)) return g.players.white;
+    return null;
+  }
+
+  function badgeText(g, res) {
+    if (res === 'win') return 'Win';
+    if (res === 'loss') return 'Loss';
+    if (res === 'draw') return 'Draw';
+    return g.winner ? (g.winner === 'white' ? 'White won' : 'Black won') : 'Draw';
+  }
+
+  function filteredGames() {
+    var dateFrom = document.getElementById('dateFrom').value;
+    var dateTo = document.getElementById('dateTo').value;
+    var openingName = document.getElementById('openingFilter').value;
+    var folderReq = {};
+    activeTagFilters.forEach(function (k) {
+      if (k.indexOf('folder:') === 0) {
+        folderReq[k] = descendantTagNames(k.slice(7)).map(function (s) { return s.toLowerCase(); });
+      }
+    });
+    return games.filter(function (g) {
+      if (speedFilter !== 'all' && g.speed !== speedFilter) return false;
+      var ts = g.lastMoveAt || g.createdAt;
+      if (dateFrom && ts < new Date(dateFrom + 'T00:00:00').getTime()) return false;
+      if (dateTo && ts > new Date(dateTo + 'T23:59:59.999').getTime()) return false;
+      if (openingName !== 'all' && (!g.opening || g.opening.name !== openingName)) return false;
+      if (activeTagFilters.length) {
+        var gts = tagsFor(g.id).map(function (t) { return t.toLowerCase(); });
+        for (var i = 0; i < activeTagFilters.length; i++) {
+          var k = activeTagFilters[i];
+          if (folderReq[k]) {
+            var hit = false;
+            for (var j = 0; j < folderReq[k].length; j++) {
+              if (gts.indexOf(folderReq[k][j]) !== -1) { hit = true; break; }
+            }
+            if (!hit) return false;
+          } else if (gts.indexOf(k) === -1) {
+            return false;
+          }
+        }
+      }
+      if (searchTerm) {
+        var hay = gameHaystack(g).join(' ').toLowerCase();
+        if (hay.indexOf(searchTerm) === -1) return false;
+      }
+      return true;
+    });
+  }
+
+  function populateOpeningFilter() {
+    var sel = document.getElementById('openingFilter');
+    sel.value = 'all';
+    var map = {};
+    games.forEach(function (g) {
+      if (g.opening && g.opening.name) {
+        var n = g.opening.name;
+        if (!map[n]) map[n] = { eco: g.opening.eco || '', count: 0 };
+        map[n].count++;
+      }
+    });
+    var names = Object.keys(map).sort(function (a, b) {
+      return map[a].eco === map[b].eco
+        ? a.localeCompare(b)
+        : (map[a].eco < map[b].eco ? -1 : 1);
+    });
+    while (sel.options.length > 1) sel.remove(1);
+    names.forEach(function (n) {
+      var o = document.createElement('option');
+      o.value = n;
+      o.textContent = (map[n].eco ? map[n].eco + ' \u00B7 ' : '') + n + ' (' + map[n].count + ')';
+      sel.appendChild(o);
+    });
+  }
+
+  function applyDatePreset(v) {
+    var from = document.getElementById('dateFrom');
+    var to = document.getElementById('dateTo');
+    function iso(d) {
+      return d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+    }
+    from.value = '';
+    to.value = '';
+    if (v === '7d' || v === '30d' || v === '90d') {
+      var days = v === '7d' ? 7 : (v === '30d' ? 30 : 90);
+      var d = new Date();
+      d.setDate(d.getDate() - days);
+      from.value = iso(d);
+    } else if (v === 'year') {
+      from.value = new Date().getFullYear() + '-01-01';
+    }
+    render();
+  }
+
+  // ---------- tag tree (nested) ----------
+  function uid() {
+    return 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+  function loadTree() {
+    var t = loadJSON(pkey(TREE_KEY));
+    if (!t || !Array.isArray(t.nodes)) {
+      t = {
+        nodes: [
+          { id: uid(), name: 'Opening Play', type: 'folder', parentId: null },
+          { id: uid(), name: 'Middlegame', type: 'folder', parentId: null },
+          { id: uid(), name: 'Endgame', type: 'folder', parentId: null }
+        ]
+      };
+      localStorage.setItem(pkey(TREE_KEY), JSON.stringify(t));
+    }
+    return t;
+  }
+  function saveTree() {
+    if (dataReadOnly()) return;
+    localStorage.setItem(pkey(TREE_KEY), JSON.stringify(tree));
+    cloudTouch('tree');
+  }
+  function nodeById(id) {
+    for (var i = 0; i < tree.nodes.length; i++) {
+      if (tree.nodes[i].id === id) return tree.nodes[i];
+    }
+    return null;
+  }
+  function childrenOf(parentId) {
+    return tree.nodes.filter(function (n) { return n.parentId === parentId; });
+  }
+  function descendantTagNames(id) {
+    var out = [];
+    (function walk(pid) {
+      childrenOf(pid).forEach(function (c) {
+        if (c.type === 'tag') out.push(c.name);
+        else walk(c.id);
+      });
+    })(id);
+    return out;
+  }
+  function isDescendantNode(id, ancestorId) {
+    var n = nodeById(id);
+    while (n && n.parentId) {
+      if (n.parentId === ancestorId) return true;
+      n = nodeById(n.parentId);
+    }
+    return false;
+  }
+  function ensureUsedTagsInTree() {
+    var inTree = {};
+    tree.nodes.forEach(function (n) {
+      if (n.type === 'tag') inTree[n.name.toLowerCase()] = 1;
+    });
+    var changed = false;
+    Object.keys(gameTags).forEach(function (gid) {
+      gameTags[gid].forEach(function (t) {
+        var l = t.toLowerCase();
+        if (!inTree[l]) {
+          tree.nodes.push({ id: uid(), name: t, type: 'tag', parentId: null });
+          inTree[l] = 1;
+          changed = true;
+        }
+      });
+    });
+    if (changed) saveTree();
+  }
+  function isFolderOpen(id) { return openFolders[id] !== false; }
+  function toggleFolderOpen(id) {
+    openFolders[id] = !isFolderOpen(id);
+    localStorage.setItem(FOLDERS_OPEN_KEY, JSON.stringify(openFolders));
+  }
+  function filterKeyFor(n) {
+    return n.type === 'folder' ? 'folder:' + n.id : n.name.toLowerCase();
+  }
+  function toggleFilterKey(key) {
+    var i = activeTagFilters.indexOf(key);
+    if (i === -1) activeTagFilters.push(key); else activeTagFilters.splice(i, 1);
+    render();
+  }
+  function gamesWithTag(name) {
+    var l = name.toLowerCase();
+    return games.filter(function (g) {
+      return tagsFor(g.id).some(function (t) { return t.toLowerCase() === l; });
+    }).length;
+  }
+  function gamesInFolder(id) {
+    var names = descendantTagNames(id).map(function (s) { return s.toLowerCase(); });
+    if (!names.length) return 0;
+    return games.filter(function (g) {
+      return tagsFor(g.id).some(function (t) { return names.indexOf(t.toLowerCase()) !== -1; });
+    }).length;
+  }
+  function countFor(n) {
+    return n.type === 'folder' ? gamesInFolder(n.id) : gamesWithTag(n.name);
+  }
+
+  function addNode(type, parentId) {
+    var label = type === 'folder' ? 'Folder name:' : 'Tag name:';
+    var name = prompt(label);
+    if (!name || !name.trim()) return;
+    tree.nodes.push({ id: uid(), name: name.trim(), type: type, parentId: parentId });
+    saveTree();
+    render();
+  }
+  function renameNode(n) {
+    var name = prompt('Rename:', n.name);
+    if (!name || !name.trim() || name.trim() === n.name) return;
+    var neu = name.trim();
+    if (n.type === 'tag') {
+      var lo = n.name.toLowerCase();
+      var lnew = neu.toLowerCase();
+      Object.keys(gameTags).forEach(function (gid) {
+        var seen = {};
+        gameTags[gid] = gameTags[gid].map(function (t) {
+          return t.toLowerCase() === lo ? neu : t;
+        }).filter(function (t) {
+          var l = t.toLowerCase();
+          if (seen[l]) return false;
+          seen[l] = 1;
+          return true;
+        });
+        if (!gameTags[gid].length) delete gameTags[gid];
+      });
+      saveTags();
+      var ix = activeTagFilters.indexOf(lo);
+      if (ix !== -1) activeTagFilters[ix] = lnew;
+    }
+    n.name = neu;
+    saveTree();
+    render();
+  }
+  function deleteNode(n) {
+    var ids = [n.id];
+    if (n.type === 'folder') {
+      (function walk(pid) {
+        childrenOf(pid).forEach(function (c) {
+          ids.push(c.id);
+          if (c.type === 'folder') walk(c.id);
+        });
+      })(n.id);
+    }
+    var tagNames = ids.map(nodeById)
+      .filter(function (x) { return x && x.type === 'tag'; })
+      .map(function (x) { return x.name.toLowerCase(); });
+    var msg = n.type === 'folder'
+      ? 'Delete folder "' + n.name + '" and everything inside it?\nIts tags will be removed from all games.'
+      : 'Delete tag "' + n.name + '" and remove it from all games?';
+    if (!confirm(msg)) return;
+    tree.nodes = tree.nodes.filter(function (x) { return ids.indexOf(x.id) === -1; });
+    if (tagNames.length) {
+      Object.keys(gameTags).forEach(function (gid) {
+        gameTags[gid] = gameTags[gid].filter(function (t) {
+          return tagNames.indexOf(t.toLowerCase()) === -1;
+        });
+        if (!gameTags[gid].length) delete gameTags[gid];
+      });
+      saveTags();
+    }
+    activeTagFilters = activeTagFilters.filter(function (k) {
+      if (k.indexOf('folder:') === 0) return ids.indexOf(k.slice(7)) === -1;
+      return tagNames.indexOf(k) === -1;
+    });
+    saveTree();
+    render();
+  }
+
+  function rowBtn(label, title, fn) {
+    var b = el('button', '', label);
+    b.type = 'button';
+    b.title = title;
+    b.addEventListener('click', function (e) { e.stopPropagation(); fn(); });
+    return b;
+  }
+
+  function treeRow(n) {
+    var li = document.createElement('li');
+    var row = el('div', 'node-row');
+    row.dataset.id = n.id;
+    var key = filterKeyFor(n);
+    if (activeTagFilters.indexOf(key) !== -1) row.classList.add('active');
+
+    if (n.type === 'folder') {
+      var caret = el('span', 'caret', isFolderOpen(n.id) ? '\u25BE' : '\u25B8');
+      caret.addEventListener('click', function (e) {
+        e.stopPropagation();
+        toggleFolderOpen(n.id);
+        renderTree();
+      });
+      row.appendChild(caret);
+    } else {
+      var dot = el('span', 'dot');
+      dot.style.background = tagColor(n.name);
+      row.appendChild(dot);
+      row.appendChild(el('span', 'caret', ''));
+    }
+
+    row.appendChild(el('span', 'nm', n.name));
+    row.appendChild(el('span', 'cnt', String(countFor(n))));
+
+    var actions = el('span', 'row-actions');
+    if (n.type === 'folder') {
+      actions.appendChild(rowBtn('+', 'Add tag inside', function () { addNode('tag', n.id); }));
+    }
+    actions.appendChild(rowBtn('\u270E', 'Rename', function () { renameNode(n); }));
+    actions.appendChild(rowBtn('\u00D7', 'Delete', function () { deleteNode(n); }));
+    row.appendChild(actions);
+
+    row.addEventListener('click', function () { toggleFilterKey(key); });
+
+    row.draggable = true;
+    row.addEventListener('dragstart', function (e) {
+      dragNodeId = n.id;
+      e.dataTransfer.setData('text/plain', n.id);
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    row.addEventListener('dragend', function () { dragNodeId = null; });
+    if (n.type === 'folder') {
+      row.addEventListener('dragover', function (e) {
+        if (dragNodeId && dragNodeId !== n.id && !isDescendantNode(dragNodeId, n.id)) {
+          e.preventDefault();
+          row.classList.add('drag-over');
+        }
+      });
+      row.addEventListener('dragleave', function () { row.classList.remove('drag-over'); });
+      row.addEventListener('drop', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        row.classList.remove('drag-over');
+        if (dragNodeId && dragNodeId !== n.id && !isDescendantNode(dragNodeId, n.id)) {
+          var m = nodeById(dragNodeId);
+          if (m) { m.parentId = n.id; saveTree(); render(); }
+        }
+      });
+    }
+    li.appendChild(row);
+    if (n.type === 'folder' && isFolderOpen(n.id)) {
+      li.appendChild(treeList(n.id));
+    }
+    return li;
+  }
+
+  function treeList(parentId) {
+    var ul = document.createElement('ul');
+    childrenOf(parentId).forEach(function (n) { ul.appendChild(treeRow(n)); });
+    return ul;
+  }
+
+  function renderTree() {
+    var host = document.getElementById('tagTree');
+    host.innerHTML = '';
+    if (!tree.nodes.length) {
+      host.appendChild(el('div', 'tree-empty', 'No tags yet. Use + Tag above.'));
+      return;
+    }
+    host.appendChild(treeList(null));
+  }
+
+  function refreshTagSuggestions() {
+    var dl = document.getElementById('tags-dl');
+    if (!dl) {
+      dl = document.createElement('datalist');
+      dl.id = 'tags-dl';
+      document.body.appendChild(dl);
+    }
+    dl.innerHTML = '';
+    allKnownTags().forEach(function (t) {
+      var o = document.createElement('option');
+      o.value = t;
+      dl.appendChild(o);
+    });
+  }
+
+  function renderPlayers() {
+    var host = document.getElementById('playerList');
+    host.innerHTML = '';
+    if (!accounts.length) {
+      host.appendChild(el('div', 'player-empty', 'No players yet \u2014 load some games.'));
+      return;
+    }
+    accounts.forEach(function (a) {
+      var row = el('div', 'node-row player-row');
+      if (currentUsername && a.name.toLowerCase() === currentUsername.toLowerCase()) {
+        row.classList.add('active');
+      }
+      var dot = el('span', 'dot');
+      dot.style.background = tagColor(a.name.toLowerCase());
+      row.appendChild(dot);
+      row.appendChild(el('span', 'caret', ''));
+      row.appendChild(el('span', 'nm', a.name));
+      row.title = 'Load games for ' + a.name;
+      var actions = el('span', 'row-actions');
+      actions.appendChild(rowBtn('\u21BB', 'Load games', function () { startLoad(a.name); }));
+      actions.appendChild(rowBtn('\u00D7', 'Remove from list', function () { removeAccount(a.name); }));
+      row.appendChild(actions);
+      row.addEventListener('click', function () { startLoad(a.name); });
+      host.appendChild(row);
+    });
+  }
+
+  function render() {
+    var banner = document.getElementById('viewAsBanner');
+    if (SB && profile && profile.cloud && cloudViewingId) {
+      var mem = memberById(cloudViewingId);
+      document.getElementById('viewAsName').textContent = mem ? (mem.display_name || 'member') : 'member';
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+    }
+    renderPlayers();
+    renderTagFilters();
+    renderTree();
+    refreshTagSuggestions();
+    document.getElementById('viewGrid').className = viewMode === 'grid' ? 'active' : '';
+    document.getElementById('viewList').className = viewMode === 'list' ? 'active' : '';
+    document.getElementById('toggleTags').className = 'btn-ghost' + (showCardTags ? ' toggle-on' : '');
+    document.getElementById('toggleNotes').className = 'btn-ghost' + (showCardNotes ? ' toggle-on' : '');
+    var main = document.getElementById('games');
+    main.innerHTML = '';
+    main.className = viewMode === 'grid' ? 'grid' : '';
+    var list = filteredGames();
+    document.getElementById('filterInfo').textContent =
+      games.length ? (list.length + ' of ' + games.length + ' games') : '';
+
+    if (!games.length) {
+      main.appendChild(emptyState('Enter your Lichess username above and hit <b>Load games</b>.'));
+      return;
+    }
+    if (!list.length) {
+      main.appendChild(emptyState('No games match the current filters.'));
+      return;
+    }
+    list.forEach(function (g) {
+      main.appendChild(viewMode === 'grid' ? gridCard(g) : gameCard(g));
+    });
+  }
+
+  function emptyState(html) {
+    var d = el('div', 'empty');
+    d.appendChild(el('span', 'knight', '\u265E'));
+    var p = el('div');
+    p.innerHTML = html;
+    d.appendChild(p);
+    return d;
+  }
+
+  function renderTagFilters() {
+    var wrap = document.getElementById('tagFilters');
+    wrap.innerHTML = '';
+    activeTagFilters.forEach(function (k) {
+      var label, color;
+      if (k.indexOf('folder:') === 0) {
+        var n = nodeById(k.slice(7));
+        label = '\u25B8 ' + (n ? n.name : '?');
+        color = '#bababa';
+      } else {
+        label = k;
+        color = tagColor(k);
+      }
+      var chip = el('span', 'chip filter-chip active', label);
+      chip.style.color = color;
+      chip.title = 'Active filter \u2014 click to remove';
+      chip.addEventListener('click', function () {
+        var i = activeTagFilters.indexOf(k);
+        if (i !== -1) activeTagFilters.splice(i, 1);
+        render();
+      });
+      wrap.appendChild(chip);
+    });
+  }
+
+  function buildTagChips(g) {
+    var wrap = el('div', 'game-tags');
+    tagsFor(g.id).forEach(function (t) { wrap.appendChild(tagChip(g.id, t)); });
+    return wrap;
+  }
+
+  function buildNoteArea(g) {
+    var wrap = el('div', 'card-note');
+    var txt = noteFor(g.id);
+    if (txt) {
+      wrap.textContent = txt;
+      wrap.title = 'Click to edit note';
+    } else {
+      wrap.classList.add('empty');
+      wrap.textContent = 'Click to add a note';
+    }
+    wrap.addEventListener('click', function () {
+      if (wrap._editing) return;
+      wrap._editing = true;
+      wrap.classList.remove('empty');
+      wrap.innerHTML = '';
+      var ta = document.createElement('textarea');
+      ta.value = noteFor(g.id);
+      ta.placeholder = 'Game note... (Ctrl+Enter to save, Esc to cancel)';
+      ta.addEventListener('click', function (e) { e.stopPropagation(); });
+      var doneFlag = false;
+      function commit(save) {
+        if (doneFlag) return;
+        doneFlag = true;
+        if (save) setNote(g.id, ta.value);
+        render();
+      }
+      ta.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); commit(true); }
+        else if (e.key === 'Escape') { e.preventDefault(); commit(false); }
+      });
+      ta.addEventListener('blur', function () { commit(true); });
+      wrap.appendChild(ta);
+      ta.focus();
+    });
+    return wrap;
+  }
+
+  function buildAddTag(g) {
+    var add = el('span', 'add-tag');
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = 'add tag';
+    input.setAttribute('list', 'tags-dl');
+    function commit() {
+      if (addTag(g.id, input.value)) render();
+    }
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); commit(); }
+      if (e.key === 'Escape') input.blur();
+    });
+    add.appendChild(input);
+    var plus = el('button', 'add-btn', '+');
+    plus.type = 'button';
+    plus.title = 'Add tag';
+    plus.addEventListener('click', commit);
+    add.appendChild(plus);
+    return add;
+  }
+
+  function tagChip(gameId, tag) {
+    var chip = el('span', 'tag-chip', tag);
+    chip.style.background = tagColor(tag);
+    var x = el('span', 'x', '\u00D7');
+    x.title = 'Remove tag';
+    x.addEventListener('click', function (e) {
+      e.stopPropagation();
+      removeTag(gameId, tag);
+      render();
+    });
+    chip.appendChild(x);
+    return chip;
+  }
+
+  function playerSpan(p, username) {
+    var span = el('span');
+    var name = playerName(p);
+    var isMe = username && p.user && p.user.name.toLowerCase() === username.toLowerCase();
+    span.appendChild(el('span', '', '\u265F '));
+    span.appendChild(el('span', isMe ? 'me' : '', name));
+    if (p.rating !== undefined) {
+      span.appendChild(el('span', 'rating', '(' + p.rating + ')'));
+    }
+    if (p.ratingDiff) {
+      var d = p.ratingDiff;
+      span.appendChild(el('span', 'diff ' + (d > 0 ? 'up' : 'down'), d > 0 ? '+' + d : String(d)));
+    }
+    return span;
+  }
+
+  function playersRow(g) {
+    var players = el('div', 'players');
+    players.appendChild(playerSpan(g.players.white, currentUsername));
+    players.appendChild(el('span', 'vs', 'vs'));
+    players.appendChild(playerSpan(g.players.black, currentUsername));
+    return players;
+  }
+
+  function lichessLink(g, cls, text) {
+    var a = el('a', cls, text);
+    a.href = 'https://lichess.org/' + g.id;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    return a;
+  }
+
+  function metaText(g) {
+    var date = new Date(g.lastMoveAt || g.createdAt);
+    var moveCount = g.moves ? g.moves.trim().split(/\s+/).length : 0;
+    return g.perf + ' \u00B7 ' + (g.rated ? 'Rated' : 'Casual') + ' \u00B7 ' +
+      moveCount + ' moves \u00B7 ' + date.toLocaleDateString();
+  }
+
+  // ---------- grid card ----------
+  function gridCard(g) {
+    var card = el('div', 'grid-card');
+    var states = getStates(g);
+    var ply = thumbPly(g);
+    var st = states[ply];
+
+    var wrap = el('div', 'thumb-wrap');
+    wrap.title = 'Click to choose the thumbnail position';
+    wrap.appendChild(boardSVG(st.board, st.from, st.to));
+    var res = userResult(g);
+    wrap.appendChild(el('span', 'badge ' + (res || 'unknown'), badgeText(g, res)));
+    wrap.appendChild(el('span', 'thumb-move', ply + '/' + (states.length - 1)));
+    wrap.addEventListener('click', function () { openPicker(g.id); });
+    card.appendChild(wrap);
+
+    var info = el('div', 'grid-info');
+    info.appendChild(playersRow(g));
+    info.appendChild(el('span', 'meta', metaText(g)));
+    if (g.opening) {
+      var op = el('div', 'opening', g.opening.name);
+      op.title = g.opening.eco + ' ' + g.opening.name;
+      info.appendChild(op);
+    }
+    card.appendChild(info);
+
+    if (showCardNotes) card.appendChild(buildNoteArea(g));
+
+    var foot = el('div', 'grid-foot');
+    if (showCardTags) {
+      foot.appendChild(buildTagChips(g));
+      foot.appendChild(buildAddTag(g));
+    } else if (tagsFor(g.id).length) {
+      var tf = el('span', 'tag-flag');
+      tf.title = 'Has tags (hidden \u2014 use the Tags toggle to show them)';
+      foot.appendChild(tf);
+    }
+    if (!showCardNotes && noteFor(g.id)) {
+      var nf = el('span', 'note-flag', '\u270E');
+      nf.title = 'Has a note (hidden \u2014 use the Notes toggle to show it)';
+      foot.appendChild(nf);
+    }
+    foot.appendChild(lichessLink(g, 'lichess-icon', '\u2197'));
+    card.appendChild(foot);
+
+    return card;
+  }
+
+  // ---------- list card ----------
+  function gameCard(g) {
+    var card = el('div', 'game-card');
+    var row = el('div', 'list-row');
+
+    var states = getStates(g);
+    var ply = thumbPly(g);
+    var st = states[ply];
+    var thumb = el('div', 'list-thumb');
+    thumb.title = 'Click to choose the thumbnail position';
+    thumb.appendChild(boardSVG(st.board, st.from, st.to));
+    thumb.addEventListener('click', function () { openPicker(g.id); });
+    row.appendChild(thumb);
+
+    var content = el('div', 'list-content');
+
+    var top = el('div', 'game-top');
+    var res = userResult(g);
+    top.appendChild(el('span', 'badge ' + (res || 'unknown'), badgeText(g, res)));
+    top.appendChild(el('span', 'meta', metaText(g)));
+    content.appendChild(top);
+
+    content.appendChild(playersRow(g));
+
+    if (g.opening) {
+      var op = el('div', 'opening');
+      op.appendChild(el('span', 'eco', g.opening.eco));
+      op.appendChild(document.createTextNode(g.opening.name));
+      content.appendChild(op);
+    }
+
+    var bottom = el('div', 'game-bottom');
+    if (showCardTags) {
+      bottom.appendChild(buildTagChips(g));
+      bottom.appendChild(buildAddTag(g));
+    } else if (tagsFor(g.id).length) {
+      var tf = el('span', 'tag-flag');
+      tf.title = 'Has tags (hidden \u2014 use the Tags toggle to show them)';
+      bottom.appendChild(tf);
+    }
+    if (!showCardNotes && noteFor(g.id)) {
+      var nf = el('span', 'note-flag', '\u270E');
+      nf.title = 'Has a note (hidden \u2014 use the Notes toggle to show it)';
+      bottom.appendChild(nf);
+    }
+    bottom.appendChild(el('span', 'spacer'));
+    bottom.appendChild(lichessLink(g, 'lichess-link', 'View on Lichess \u2197'));
+    content.appendChild(bottom);
+
+    if (showCardNotes) content.appendChild(buildNoteArea(g));
+
+    row.appendChild(content);
+    card.appendChild(row);
+    return card;
+  }
+
+  // ---------- thumbnail picker modal ----------
+  var picker = { gid: null, ply: 0, max: 0 };
+  var modal = document.getElementById('thumbModal');
+  var modalBoard = document.getElementById('modalBoard');
+  var modalSlider = document.getElementById('modalSlider');
+  var modalLabel = document.getElementById('modalLabel');
+
+  function findGame(id) {
+    for (var i = 0; i < games.length; i++) if (games[i].id === id) return games[i];
+    return null;
+  }
+
+  function openPicker(gameId) {
+    var g = findGame(gameId);
+    if (!g) return;
+    picker.gid = gameId;
+    picker.max = maxPly(g);
+    picker.ply = thumbPly(g);
+    modalSlider.min = 0;
+    modalSlider.max = picker.max;
+    modalSlider.value = picker.ply;
+    modal.classList.remove('hidden');
+    paintPicker();
+  }
+
+  function closePicker() {
+    modal.classList.add('hidden');
+    picker.gid = null;
+    render();
+  }
+
+  function paintPicker() {
+    var g = findGame(picker.gid);
+    if (!g) return;
+    var st = getStates(g)[picker.ply];
+    modalBoard.innerHTML = '';
+    modalBoard.appendChild(boardSVG(st.board, st.from, st.to));
+    modalSlider.value = picker.ply;
+    modalLabel.textContent = moveLabel(g, picker.ply) +
+      '  \u00B7  position ' + picker.ply + ' of ' + picker.max;
+    gameThumbs[picker.gid] = picker.ply;
+    saveThumbs();
+  }
+
+  function stepPicker(delta) {
+    var next = Math.min(picker.max, Math.max(0, picker.ply + delta));
+    if (next === picker.ply) return;
+    picker.ply = next;
+    paintPicker();
+  }
+
+  modalSlider.addEventListener('input', function () {
+    picker.ply = +modalSlider.value;
+    paintPicker();
+  });
+  document.getElementById('modalPrev').addEventListener('click', function () { stepPicker(-1); });
+  document.getElementById('modalNext').addEventListener('click', function () { stepPicker(1); });
+  document.getElementById('modalClose').addEventListener('click', closePicker);
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) closePicker();
+  });
+  document.addEventListener('keydown', function (e) {
+    if (modal.classList.contains('hidden')) return;
+    if (e.key === 'ArrowLeft') { e.preventDefault(); stepPicker(-1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); stepPicker(1); }
+    else if (e.key === 'Escape') closePicker();
+  });
+
+  // ---------- view toggle ----------
+  function setView(mode) {
+    viewMode = mode;
+    localStorage.setItem(VIEW_KEY, mode);
+    render();
+  }
+  document.getElementById('viewGrid').addEventListener('click', function () { setView('grid'); });
+  document.getElementById('viewList').addEventListener('click', function () { setView('list'); });
+
+  // ---------- export / import ----------
+  function exportTags() {
+    var payload = { version: 3, tags: gameTags, tree: tree.nodes, notes: gameNotes };
+    var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'lichess-game-tags.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  function importTags(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      try {
+        var data = JSON.parse(reader.result);
+        var tagData = null;
+        if (data && typeof data === 'object' && data.tags && typeof data.tags === 'object') {
+          tagData = data.tags;
+        } else if (data && typeof data === 'object') {
+          tagData = data;
+        }
+        if (!tagData) throw new Error('bad file');
+        Object.keys(tagData).forEach(function (id) {
+          if (Array.isArray(tagData[id])) {
+            tagData[id].forEach(function (t) { addTag(id, t); });
+          }
+        });
+        if (data && Array.isArray(data.tree)) {
+          data.tree.forEach(function (n) {
+            if (n && n.id && !nodeById(n.id)) tree.nodes.push(n);
+          });
+        }
+        if (data && data.notes && typeof data.notes === 'object') {
+          Object.keys(data.notes).forEach(function (id) {
+            if (typeof data.notes[id] === 'string' && data.notes[id].trim()) {
+              gameNotes[id] = data.notes[id];
+            }
+          });
+          saveNotes();
+        }
+        ensureUsedTagsInTree();
+        saveTree();
+        render();
+        setStatus('Tags imported.');
+      } catch (e) {
+        setStatus('Import failed: not a valid tags JSON file.', true, false);
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  // ---------- wire up ----------
+  function readLoadForm() {
+    var u = document.getElementById('username').value.trim();
+    if (!u) { setStatus('Please enter a username.', true, false); return null; }
+    var minRaw = document.getElementById('loadMinRating').value.trim();
+    var minRating = null;
+    if (minRaw !== '') {
+      minRating = parseInt(minRaw, 10);
+      if (isNaN(minRating) || minRating < 0) {
+        setStatus('Min opponent rating must be a non-negative number.', true, false);
+        return null;
+      }
+      if (minRating === 0) minRating = null;
+    }
+    return {
+      username: u,
+      max: document.getElementById('count').value,
+      opts: {
+        color: document.getElementById('loadColor').value,
+        result: document.getElementById('loadResult').value,
+        minRating: minRating
+      }
+    };
+  }
+  function startLoad(name) {
+    if (name) document.getElementById('username').value = name;
+    var f = readLoadForm();
+    if (f) fetchGames(f.username, f.max, f.opts);
+  }
+
+  document.getElementById('fetchForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    startLoad();
+  });
+
+  document.getElementById('search').addEventListener('input', function (e) {
+    searchTerm = e.target.value.trim().toLowerCase();
+    render();
+  });
+
+  document.getElementById('speedFilter').addEventListener('change', function (e) {
+    speedFilter = e.target.value;
+    render();
+  });
+
+  document.getElementById('datePreset').addEventListener('change', function (e) {
+    applyDatePreset(e.target.value);
+  });
+  ['dateFrom', 'dateTo'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', function () {
+      document.getElementById('datePreset').value = 'custom';
+      render();
+    });
+  });
+  document.getElementById('openingFilter').addEventListener('change', render);
+
+  function setCardToggle(which, on) {
+    if (which === 'tags') {
+      showCardTags = on;
+      localStorage.setItem(SHOW_TAGS_KEY, on ? '1' : '0');
+    } else {
+      showCardNotes = on;
+      localStorage.setItem(SHOW_NOTES_KEY, on ? '1' : '0');
+    }
+    render();
+  }
+  document.getElementById('toggleTags').addEventListener('click', function () {
+    setCardToggle('tags', !showCardTags);
+  });
+  document.getElementById('toggleNotes').addEventListener('click', function () {
+    setCardToggle('notes', !showCardNotes);
+  });
+
+  document.getElementById('clearFilters').addEventListener('click', function () {
+    searchTerm = '';
+    speedFilter = 'all';
+    activeTagFilters = [];
+    document.getElementById('search').value = '';
+    document.getElementById('speedFilter').value = 'all';
+    document.getElementById('datePreset').value = 'all';
+    document.getElementById('dateFrom').value = '';
+    document.getElementById('dateTo').value = '';
+    document.getElementById('openingFilter').value = 'all';
+    render();
+  });
+
+  document.getElementById('addFolderBtn').addEventListener('click', function () { addNode('folder', null); });
+  document.getElementById('addTagBtn').addEventListener('click', function () { addNode('tag', null); });
+
+  var sidepanel = document.getElementById('sidepanel');
+  sidepanel.addEventListener('dragover', function (e) {
+    if (dragNodeId) e.preventDefault();
+  });
+  sidepanel.addEventListener('drop', function (e) {
+    if (!dragNodeId) return;
+    if (e.target.closest && e.target.closest('.node-row')) return;
+    e.preventDefault();
+    var m = nodeById(dragNodeId);
+    if (m) { m.parentId = null; saveTree(); render(); }
+  });
+
+  document.getElementById('exportBtn').addEventListener('click', exportTags);
+  document.getElementById('importBtn').addEventListener('click', function () {
+    document.getElementById('importFile').click();
+  });
+  document.getElementById('importFile').addEventListener('change', function (e) {
+    if (e.target.files.length) importTags(e.target.files[0]);
+    e.target.value = '';
+  });
+
+  // ---------- cloud (supabase) ----------
+  function cloudTouch(key) {
+    if (!SB || !profile || !profile.cloud || dataReadOnly()) return;
+    cloudDirty[key] = true;
+    scheduleCloudPush();
+  }
+  function setSyncState(state) {
+    var elx = document.getElementById('syncState');
+    if (!SB || !profile || !profile.cloud || dataReadOnly()) {
+      elx.className = 'hidden';
+      return;
+    }
+    elx.className = 'sync-' + state;
+    if (state === 'saving') {
+      elx.textContent = '\u2601\u2026';
+      elx.title = 'Saving to cloud\u2026';
+    } else if (state === 'offline') {
+      elx.textContent = '\u2601!';
+      elx.title = 'Offline - changes are kept in this browser and will sync later.';
+    } else {
+      elx.textContent = '\u2601 \u2713';
+      elx.title = 'All changes synced.';
+    }
+  }
+  function cloudBaseFor(k) {
+    if (k === 'tags') return TAGS_KEY;
+    if (k === 'notes') return NOTES_KEY;
+    if (k === 'thumbs') return THUMBS_KEY;
+    if (k === 'tree') return TREE_KEY;
+    if (k === 'accounts') return ACCOUNTS_KEY;
+    return null;
+  }
+  function cloudBlobGet(k) {
+    if (k === 'tags') return gameTags;
+    if (k === 'notes') return gameNotes;
+    if (k === 'thumbs') return gameThumbs;
+    if (k === 'tree') return tree;
+    if (k === 'accounts') return accounts;
+    return null;
+  }
+  function cloudBlobSet(k, v) {
+    if (k === 'tags') gameTags = (v && typeof v === 'object') ? v : {};
+    else if (k === 'notes') gameNotes = (v && typeof v === 'object') ? v : {};
+    else if (k === 'thumbs') gameThumbs = (v && typeof v === 'object') ? v : {};
+    else if (k === 'tree') tree = (v && Array.isArray(v.nodes)) ? v : { nodes: [] };
+    else if (k === 'accounts') accounts = Array.isArray(v) ? v : [];
+  }
+  function applyCloudBlobs(blobs) {
+    Object.keys(blobs).forEach(function (k) {
+      if (CLOUD_KEYS.indexOf(k) === -1) return;
+      cloudBlobSet(k, blobs[k]);
+      var base = cloudBaseFor(k);
+      if (base) localStorage.setItem(pkey(base), JSON.stringify(cloudBlobGet(k)));
+    });
+  }
+  function cloudFetchBlobs(ownerId) {
+    return SB.from('user_data')
+      .select('key,value')
+      .eq('workspace_id', profile.workspaceId)
+      .eq('user_id', ownerId)
+      .then(function (res) {
+        if (res.error) throw res.error;
+        var blobs = {};
+        (res.data || []).forEach(function (row) { blobs[row.key] = row.value; });
+        return blobs;
+      });
+  }
+  function cloudAdoptAndPush(blobs) {
+    var missing = [];
+    CLOUD_KEYS.forEach(function (k) {
+      if (!(k in blobs)) {
+        var base = cloudBaseFor(k);
+        var cached = loadJSON(pkey(base));
+        if (cached) { cloudBlobSet(k, cached); missing.push(k); }
+      }
+    });
+    applyCloudBlobs(blobs);
+    ensureUsedTagsInTree();
+    missing.forEach(function (k) { cloudDirty[k] = true; });
+    render();
+    if (missing.length) cloudPush();
+    else setSyncState('synced');
+  }
+  function scheduleCloudPush() {
+    if (!SB || !profile || !profile.cloud || dataReadOnly()) return;
+    setSyncState('saving');
+    if (cloudTimer) clearTimeout(cloudTimer);
+    cloudTimer = setTimeout(cloudPush, 1200);
+  }
+  function cloudPush() {
+    if (cloudTimer) { clearTimeout(cloudTimer); cloudTimer = null; }
+    if (!SB || !profile || !profile.cloud || dataReadOnly() || !profile.workspaceId) return;
+    var keys = Object.keys(cloudDirty);
+    if (!keys.length) { setSyncState('synced'); return; }
+    var wsId = profile.workspaceId;
+    var uid = profile.id;
+    var rows = keys.map(function (k) {
+      return {
+        workspace_id: wsId,
+        user_id: uid,
+        key: k,
+        value: cloudBlobGet(k),
+        updated_at: new Date().toISOString()
+      };
+    });
+    cloudDirty = {};
+    SB.from('user_data').upsert(rows).then(function (res) {
+      if (res.error) {
+        keys.forEach(function (k) { cloudDirty[k] = true; });
+        setSyncState('offline');
+        setTimeout(function () {
+          if (Object.keys(cloudDirty).length) cloudPush();
+        }, 15000);
+      } else {
+        setSyncState('synced');
+      }
+    });
+  }
+  function memberById(id) {
+    for (var i = 0; i < cloudMembers.length; i++) {
+      if (cloudMembers[i].user_id === id) return cloudMembers[i];
+    }
+    return null;
+  }
+  function loadCloudMembers() {
+    if (!profile.workspaceId) return Promise.resolve();
+    return SB.from('workspace_members')
+      .select('user_id,role,display_name')
+      .eq('workspace_id', profile.workspaceId)
+      .then(function (res) {
+        if (!res.error) cloudMembers = res.data || [];
+        if (cloudView === 'menu') renderProfileModal();
+      });
+  }
+  function loadWorkspaceName() {
+    if (!profile.workspaceId) { cloudWorkspace = { id: null, name: '' }; return; }
+    SB.from('workspaces').select('name').eq('id', profile.workspaceId)
+      .then(function (res) {
+        if (!res.error && res.data && res.data.length) {
+          cloudWorkspace = { id: profile.workspaceId, name: res.data[0].name };
+          if (cloudView === 'menu') renderProfileModal();
+        }
+      });
+  }
+  function authErrMsg(err) {
+    var m = (err && err.message) || 'Something went wrong.';
+    if (/confirm/i.test(m)) return 'Please confirm your email first (check your inbox), then sign in.';
+    if (/invalid login/i.test(m)) return 'Wrong email or password.';
+    if (/already registered/i.test(m)) return 'That email is already registered - try signing in.';
+    if (/password should be/i.test(m)) return 'Password too short (min. 6 characters).';
+    if (/rate/i.test(m)) return 'Too many attempts - wait a moment and try again.';
+    return m;
+  }
+  function cloudSignedIn(user) {
+    cloudUser = user;
+    SB.from('workspace_members').select('workspace_id,role,display_name')
+      .eq('user_id', user.id)
+      .then(function (res) {
+        if (res.error) {
+          setStatus('Cloud error: ' + res.error.message, true, false);
+          openProfileModal(true);
+          return;
+        }
+        var m = (res.data || [])[0];
+        if (!m) {
+          profile = {
+            id: user.id, cloud: true, workspaceId: null, role: null,
+            name: (user.user_metadata && user.user_metadata.display_name) || user.email
+          };
+          cloudViewingId = null;
+          cloudMembers = [];
+          cloudWorkspace = { id: null, name: '' };
+          renderProfileBtn();
+          cloudView = 'menu';
+          openProfileModal(true);
+          renderProfileModal();
+          return;
+        }
+        profile = {
+          id: user.id, cloud: true, workspaceId: m.workspace_id, role: m.role,
+          name: m.display_name || (user.user_metadata && user.user_metadata.display_name) || user.email
+        };
+        cloudViewingId = null;
+        loadProfileData(profile);
+        closeProfileModal();
+        setSyncState('saving');
+        loadCloudMembers();
+        loadWorkspaceName();
+        cloudFetchBlobs(profile.id).then(cloudAdoptAndPush)
+          .catch(function () { setSyncState('offline'); });
+      });
+  }
+  function cloudSignIn() {
+    var email = document.getElementById('authEmail').value.trim();
+    var pass = document.getElementById('authPass').value;
+    profileError('');
+    if (!email || !pass) { profileError('Email and password required.'); return; }
+    SB.auth.signInWithPassword({ email: email, password: pass }).then(function (res) {
+      if (res.error) { profileError(authErrMsg(res.error)); return; }
+      if (res.data && res.data.user) cloudSignedIn(res.data.user);
+    });
+  }
+  function cloudFinishSignup(user, name, code) {
+    function done() { cloudSignedIn(user); }
+    if (code) {
+      SB.rpc('join_workspace', { ws: code, pname: name }).then(function (res) {
+        if (res.error) { profileError(authErrMsg(res.error)); return; }
+        done();
+      });
+    } else {
+      SB.from('workspaces')
+        .insert({ name: (name || 'Chess') + "'s study", owner: user.id })
+        .then(function (res) {
+          if (res.error) { profileError('Could not create workspace: ' + res.error.message); return; }
+          done();
+        });
+    }
+  }
+  function cloudSignUp() {
+    var name = document.getElementById('suName').value.trim();
+    var email = document.getElementById('suEmail').value.trim();
+    var pass = document.getElementById('suPass').value;
+    var code = document.getElementById('suCode').value.trim();
+    profileError('');
+    if (!name) { profileError('Please enter your name.'); return; }
+    if (!email || !pass) { profileError('Email and password required.'); return; }
+    if (pass.length < 6) { profileError('Password too short (min. 6 characters).'); return; }
+    SB.auth.signUp({ email: email, password: pass }).then(function (res) {
+      if (res.error) { profileError(authErrMsg(res.error)); return; }
+      var user = res.data && res.data.user;
+      if (!user) {
+        profileError('Account created - check your email to confirm, then sign in.');
+        cloudView = 'signin';
+        renderProfileModal();
+        return;
+      }
+      cloudFinishSignup(user, name, code);
+    });
+  }
+  function cloudJoinExisting() {
+    var code = document.getElementById('joinCode').value.trim();
+    profileError('');
+    if (!code) { profileError('Enter the workspace code from your coach.'); return; }
+    var name = profile.name && profile.name.indexOf('@') === -1 ? profile.name : 'Student';
+    SB.rpc('join_workspace', { ws: code, pname: name }).then(function (res) {
+      if (res.error) { profileError(authErrMsg(res.error)); return; }
+      cloudSignedIn(cloudUser);
+    });
+  }
+  function cloudCreateWorkspace() {
+    profileError('');
+    SB.from('workspaces')
+      .insert({ name: 'Chess study', owner: profile.id })
+      .then(function (res) {
+        if (res.error) { profileError('Could not create workspace: ' + res.error.message); return; }
+        cloudSignedIn(cloudUser);
+      });
+  }
+  function cloudSignOut() {
+    if (!SB) return;
+    cloudPush();
+    SB.auth.signOut().then(function () {
+      profile = null;
+      cloudUser = null;
+      cloudViewingId = null;
+      cloudMembers = [];
+      cloudWorkspace = { id: null, name: '' };
+      games = [];
+      gameTags = {};
+      gameThumbs = {};
+      gameNotes = {};
+      tree = { nodes: [] };
+      accounts = [];
+      activeTagFilters = [];
+      cloudView = 'signin';
+      renderProfileBtn();
+      setSyncState('synced');
+      render();
+      openProfileModal(true);
+    });
+  }
+  function cloudViewAs(memberId) {
+    if (!profile || !profile.cloud) return;
+    var target = memberId === profile.id ? null : memberId;
+    cloudDirty = {};
+    if (cloudTimer) { clearTimeout(cloudTimer); cloudTimer = null; }
+    cloudViewingId = target;
+    closeProfileModal();
+    if (!target) {
+      setSyncState('saving');
+      cloudFetchBlobs(profile.id).then(cloudAdoptAndPush)
+        .catch(function () { setSyncState('offline'); render(); });
+      return;
+    }
+    cloudFetchBlobs(target).then(function (blobs) {
+      applyCloudBlobs(blobs);
+      ensureUsedTagsInTree();
+      render();
+    }).catch(function () {
+      setStatus("Could not load that member's annotations.", true, false);
+      render();
+    });
+  }
+  function copyWorkspaceCode() {
+    var code = profile.workspaceId;
+    function fallback() { window.prompt('Workspace code:', code); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(function () {}, fallback);
+    } else fallback();
+  }
+  if (typeof window.addEventListener === 'function') {
+    window.addEventListener('beforeunload', function () {
+      if (SB && profile && profile.cloud && Object.keys(cloudDirty).length) cloudPush();
+    });
+  }
+
+  // ---------- profile modal ----------
+  var profileModal = document.getElementById('profileModal');
+  var profileForced = false;
+
+  function openProfileModal(forced) {
+    profileForced = !!forced && !profile;
+    profileModal.classList.remove('hidden');
+    document.getElementById('profileModalClose').style.display = profileForced ? 'none' : '';
+    cancelPendingPin();
+    profileError('');
+    renderProfileModal();
+  }
+  function closeProfileModal() {
+    if (profileForced && !profile) return;
+    profileModal.classList.add('hidden');
+  }
+  function profileError(msg) {
+    document.getElementById('profileError').textContent = msg || '';
+  }
+  function cancelPendingPin() {
+    pendingProfile = null;
+    document.getElementById('pinRow').classList.add('hidden');
+    document.getElementById('pinInput').value = '';
+  }
+  function selectProfile(p) {
+    profileError('');
+    if (!p.pin) { login(p); return; }
+    pendingProfile = p;
+    document.getElementById('pinRow').classList.remove('hidden');
+    var inp = document.getElementById('pinInput');
+    inp.value = '';
+    inp.placeholder = 'PIN for ' + p.name;
+    inp.focus();
+  }
+  function tryPinLogin() {
+    if (!pendingProfile) return;
+    var inp = document.getElementById('pinInput');
+    if (pinHash(inp.value) === pendingProfile.pin) {
+      var p = pendingProfile;
+      cancelPendingPin();
+      login(p);
+    } else {
+      profileError('Wrong PIN for ' + pendingProfile.name + '.');
+      inp.value = '';
+      inp.focus();
+    }
+  }
+  function showEl(id, on) {
+    var e = document.getElementById(id);
+    var parts = e.className.split(/\s+/).filter(function (c) { return c && c !== 'hidden'; });
+    if (!on) parts.push('hidden');
+    e.className = parts.join(' ');
+  }
+  function renderProfileModal() {
+    if (SB) { renderCloudModal(); return; }
+    showEl('cloudAuth', false);
+    showEl('cloudMenu', false);
+    showEl('localNote', true);
+    var host = document.getElementById('profileList');
+    host.innerHTML = '';
+    profiles.forEach(function (p) {
+      var row = el('div', 'p-row');
+      if (profile && p.id === profile.id) row.classList.add('current');
+      var dot = el('span', 'dot');
+      dot.style.background = p.role === 'coach' ? 'var(--accent)' : '#3893e8';
+      row.appendChild(dot);
+      row.appendChild(el('span', 'nm', p.name));
+      row.appendChild(el('span', 'p-role', p.role));
+      var actions = el('span', 'row-actions');
+      if (profile && profile.role === 'coach') {
+        actions.appendChild(rowBtn('\u270E', 'Set / change PIN', function () {
+          var pin = prompt('New PIN for ' + p.name + ' (leave empty to remove the PIN):', '');
+          if (pin === null) return;
+          p.pin = pin.trim() ? pinHash(pin.trim()) : null;
+          saveProfiles();
+          renderProfileModal();
+        }));
+        if (p.role !== 'coach') {
+          actions.appendChild(rowBtn('\u00D7', 'Delete profile and its tags', function () {
+            if (!confirm('Delete profile "' + p.name + '" and all of its tags, thumbnails and player list?')) return;
+            profiles = profiles.filter(function (x) { return x.id !== p.id; });
+            LEGACY_KEYS.concat([ACCOUNTS_KEY]).forEach(function (base) {
+              localStorage.removeItem(base + '.' + p.id);
+            });
+            saveProfiles();
+            renderProfileModal();
+          }));
+        }
+      }
+      row.appendChild(actions);
+      row.addEventListener('click', function () { selectProfile(p); });
+      host.appendChild(row);
+    });
+    document.getElementById('coachTools').className =
+      profile && profile.role === 'coach' ? 'coach-form' : 'coach-form hidden';
+    document.getElementById('logoutBtn').className =
+      profile ? 'btn-ghost' : 'btn-ghost hidden';
+    document.getElementById('profileModalTitle').textContent =
+      profile ? 'Profiles' : 'Log in';
+  }
+
+  function renderCloudModal() {
+    showEl('profileList', false);
+    showEl('pinRow', false);
+    showEl('coachTools', false);
+    showEl('logoutRow', false);
+    showEl('localNote', false);
+    var signedIn = !!(profile && profile.cloud);
+    showEl('cloudAuth', !signedIn);
+    showEl('cloudMenu', signedIn);
+    if (!signedIn) {
+      showEl('authSignin', cloudView === 'signin');
+      showEl('authSignup', cloudView === 'signup');
+      document.getElementById('profileModalTitle').textContent =
+        cloudView === 'signup' ? 'Create account' : 'Sign in';
+      return;
+    }
+    var who = document.getElementById('cloudWho');
+    who.innerHTML = '';
+    who.appendChild(document.createTextNode(
+      'Signed in as ' + profile.name + ' (' + profile.role + ')' +
+      (cloudWorkspace.name ? ' \u00B7 ' + cloudWorkspace.name : '')));
+    var codeRow = document.getElementById('cloudCodeRow');
+    if (profile.role === 'coach' && profile.workspaceId) {
+      codeRow.className = 'cloud-code';
+      codeRow.innerHTML = '';
+      codeRow.appendChild(document.createTextNode('Workspace code for your student: '));
+      codeRow.appendChild(el('span', 'code-text', profile.workspaceId));
+      var cp = el('button', 'btn-ghost', 'Copy');
+      cp.type = 'button';
+      cp.addEventListener('click', copyWorkspaceCode);
+      codeRow.appendChild(cp);
+    } else {
+      codeRow.className = 'cloud-code hidden';
+    }
+    var membersHost = document.getElementById('cloudMembers');
+    membersHost.innerHTML = '';
+    cloudMembers.forEach(function (mem) {
+      var row = el('div', 'p-row');
+      if (mem.user_id === (cloudViewingId || profile.id)) row.classList.add('current');
+      var dot = el('span', 'dot');
+      dot.style.background = mem.role === 'coach' ? 'var(--accent)' : '#3893e8';
+      row.appendChild(dot);
+      row.appendChild(el('span', 'nm',
+        (mem.display_name || 'Member') + (mem.user_id === profile.id ? ' (you)' : '')));
+      row.appendChild(el('span', 'p-role', mem.role));
+      if (profile.role === 'coach' && mem.user_id !== profile.id) {
+        var actions = el('span', 'row-actions');
+        var viewing = cloudViewingId === mem.user_id;
+        var vb = rowBtn(viewing ? '\u25C0 Mine' : 'View',
+          'View their annotations (read-only)',
+          function () { cloudViewAs(mem.user_id); });
+        vb.style.fontSize = '12px';
+        actions.appendChild(vb);
+        row.appendChild(actions);
+      }
+      membersHost.appendChild(row);
+    });
+    showEl('cloudJoin', !profile.workspaceId);
+    document.getElementById('profileModalTitle').textContent = 'Account';
+  }
+
+  document.getElementById('profileBtn').addEventListener('click', function () {
+    openProfileModal(!profile);
+  });
+  document.getElementById('profileModalClose').addEventListener('click', closeProfileModal);
+  profileModal.addEventListener('click', function (e) {
+    if (e.target === profileModal) closeProfileModal();
+  });
+  document.getElementById('pinGo').addEventListener('click', tryPinLogin);
+  document.getElementById('pinInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); tryPinLogin(); }
+  });
+  document.getElementById('addStudentBtn').addEventListener('click', function () {
+    var nameEl = document.getElementById('newStudentName');
+    var pinEl = document.getElementById('newStudentPin');
+    var name = nameEl.value.trim();
+    if (!name) { profileError('Student name required.'); return; }
+    var dupe = profiles.filter(function (p) {
+      return p.name.toLowerCase() === name.toLowerCase();
+    }).length;
+    if (dupe) { profileError('A profile with that name already exists.'); return; }
+    profiles.push({
+      id: uid(),
+      name: name,
+      role: 'student',
+      pin: pinEl.value.trim() ? pinHash(pinEl.value.trim()) : null
+    });
+    nameEl.value = '';
+    pinEl.value = '';
+    profileError('');
+    saveProfiles();
+    renderProfileModal();
+  });
+  document.getElementById('logoutBtn').addEventListener('click', logout);
+  document.getElementById('authSigninBtn').addEventListener('click', cloudSignIn);
+  document.getElementById('authPass').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); cloudSignIn(); }
+  });
+  document.getElementById('authSignupBtn').addEventListener('click', cloudSignUp);
+  document.getElementById('authToSignup').addEventListener('click', function (e) {
+    e.preventDefault();
+    cloudView = 'signup';
+    profileError('');
+    renderProfileModal();
+  });
+  document.getElementById('authToSignin').addEventListener('click', function (e) {
+    e.preventDefault();
+    cloudView = 'signin';
+    profileError('');
+    renderProfileModal();
+  });
+  document.getElementById('joinBtn').addEventListener('click', cloudJoinExisting);
+  document.getElementById('createWsBtn').addEventListener('click', cloudCreateWorkspace);
+  document.getElementById('cloudSignout').addEventListener('click', cloudSignOut);
+  document.getElementById('viewAsBack').addEventListener('click', function () {
+    cloudViewAs(profile.id);
+  });
+  document.getElementById('addPlayerBtn').addEventListener('click', function () {
+    var name = prompt('Lichess username to load:');
+    if (name && name.trim()) startLoad(name.trim());
+  });
+  document.addEventListener('keydown', function (e) {
+    if (profileModal.classList.contains('hidden')) return;
+    if (e.key === 'Escape' && !profileForced) closeProfileModal();
+  });
+
+  // ---------- boot ----------
+  if (SB) {
+    SB.auth.getSession().then(function (res) {
+      var s = res.data && res.data.session;
+      if (s && s.user) cloudSignedIn(s.user);
+      else openProfileModal(true);
+    });
+  } else {
+    profiles = loadProfiles();
+    var bootProfile = loggedInProfile() ||
+      (profiles.length === 1 && !profiles[0].pin ? profiles[0] : null);
+    if (bootProfile) login(bootProfile);
+    else openProfileModal(true);
+  }
+})();
+</script>
+</body>
+</html>
