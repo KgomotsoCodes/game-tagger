@@ -826,12 +826,33 @@
   var viewMode = localStorage.getItem(VIEW_KEY) || 'grid';
 
   var SB = null;
-  try {
-    if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY &&
-        typeof window.supabase !== 'undefined' && window.supabase.createClient) {
-      SB = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+  var cloudConfigError = '';
+  (function initSupabase() {
+    var rawUrl = String(window.SUPABASE_URL || '');
+    var rawKey = String(window.SUPABASE_ANON_KEY || '');
+    if (!rawUrl.trim() || !rawKey.trim()) return;
+    if (typeof window.supabase === 'undefined' || !window.supabase.createClient) {
+      cloudConfigError = 'Supabase library failed to load (offline or blocked CDN). Cloud features are disabled.';
+      return;
     }
-  } catch (e) { SB = null; }
+    var url = rawUrl.trim().replace(/\/+$/, '');
+    if (/supabase\.com\/dashboard/i.test(url)) {
+      var refm = url.match(/\/project\/([a-z0-9-]+)/i);
+      if (refm) {
+        url = 'https://' + refm[1] + '.supabase.co';
+      } else {
+        cloudConfigError = 'SUPABASE_URL in config.js is a dashboard link. Use the project URL: https://YOUR_PROJECT_REF.supabase.co';
+        return;
+      }
+    }
+    url = url.replace(/\/(rest|auth|storage)\/v1\/?$/i, '');
+    try {
+      SB = window.supabase.createClient(url, rawKey.trim());
+    } catch (e) {
+      SB = null;
+      cloudConfigError = 'Could not initialise Supabase with SUPABASE_URL "' + url + '". Expected https://YOUR_PROJECT_REF.supabase.co';
+    }
+  })();
   var CLOUD_KEYS = ['tags', 'notes', 'thumbs', 'tree', 'accounts'];
   var cloudView = 'signin';
   var cloudUser = null;
@@ -2458,6 +2479,8 @@
   }
   function authErrMsg(err) {
     var m = (err && err.message) || 'Something went wrong.';
+    if (/invalid path/i.test(m)) return 'The Supabase URL in config.js is malformed. It must be exactly https://YOUR_PROJECT_REF.supabase.co - no trailing slash, no /dashboard or /rest path.';
+    if (/failed to fetch/i.test(m)) return 'Could not reach Supabase - check your connection or the URL in config.js.';
     if (/confirm/i.test(m)) return 'Please confirm your email first (check your inbox), then sign in.';
     if (/invalid login/i.test(m)) return 'Wrong email or password.';
     if (/already registered/i.test(m)) return 'That email is already registered - try signing in.';
@@ -2743,6 +2766,7 @@
       showEl('authSignup', cloudView === 'signup');
       document.getElementById('profileModalTitle').textContent =
         cloudView === 'signup' ? 'Create account' : 'Sign in';
+      if (cloudConfigError) profileError(cloudConfigError);
       return;
     }
     var who = document.getElementById('cloudWho');
